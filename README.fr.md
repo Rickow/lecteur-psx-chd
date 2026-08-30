@@ -78,9 +78,11 @@ python3 serve/lancer_lecteur_psx.py
 Il sert la page avec les bons en-têtes et ouvre votre navigateur sur
 `http://127.0.0.1:8901/lecteur-psx.html`.
 
-> **Brave/Chrome** : si l'écran est noir, l'accélération GPU est probablement désactivée
-> (`brave://gpu` → `WebGL: Disabled`). Activez `brave://flags/#ignore-gpu-blocklist`
-> (*Enabled*) et l'accélération matérielle, ou utilisez **Firefox**.
+> **⚠️ Brave sous Linux** — le piège classique : Brave (et parfois Chrome) désactive
+> souvent l'accélération GPU sous Linux (`brave://gpu` → `WebGL: Disabled`), d'où un
+> **écran noir**. Le lecteur le détecte et te prévient — ce **n'est pas un bug du lecteur**
+> (Firefox fonctionne d'emblée). Solution : soit **utiliser Firefox**, soit activer
+> `brave://flags/#ignore-gpu-blocklist` + l'accélération matérielle et relancer Brave.
 
 ### Installer en PWA sur iPhone
 

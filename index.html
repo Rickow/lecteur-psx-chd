@@ -70,9 +70,11 @@
       <li>Click <a href="lecteur-psx.html"><strong>Play now</strong></a> → <em>Load a disc</em> → pick your file.</li>
       <li>On iPhone: open in <strong>Safari</strong> → <strong>Share</strong> → <strong>Add to Home Screen</strong>.</li>
     </ol>
-    <p class="note">💡 A BIOS is optional (the player uses HLE by default). If the screen
-      stays black on Brave/Chrome, GPU acceleration is likely disabled — enable
-      <code>chrome://flags/#ignore-gpu-blocklist</code>, or use Firefox.</p>
+    <p class="note">💡 A BIOS is optional (the player uses HLE by default).<br>
+      <strong>⚠️ Brave on Linux:</strong> Brave often disables GPU acceleration on Linux
+      (<code>brave://gpu</code> → <code>WebGL: Disabled</code>) → <strong>black screen</strong>.
+      That's a Brave/GPU config issue, not a player bug. Easiest fix: <strong>use Firefox</strong>,
+      or enable <code>brave://flags/#ignore-gpu-blocklist</code> and relaunch Brave.</p>
   </section>
 
   <section>

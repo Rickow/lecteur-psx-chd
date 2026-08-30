@@ -77,9 +77,11 @@ python3 serve/lancer_lecteur_psx.py
 It serves the page with the right headers and opens your browser at
 `http://127.0.0.1:8901/lecteur-psx.html`.
 
-> **Brave/Chrome**: a black screen usually means GPU acceleration is disabled
-> (`chrome://gpu` → `WebGL: Disabled`). Enable `chrome://flags/#ignore-gpu-blocklist`
-> and hardware acceleration, or use **Firefox**.
+> **⚠️ Brave on Linux** — known gotcha: Brave (and sometimes Chrome) often ships with GPU
+> acceleration disabled on Linux (`brave://gpu` shows `WebGL: Disabled`), which gives a
+> **black screen**. The player detects this and warns you — it's **not a bug in the player**
+> (Firefox works out of the box). Fix: either **use Firefox**, or enable
+> `brave://flags/#ignore-gpu-blocklist` + hardware acceleration and relaunch Brave.
 
 ### Install as a PWA on iPhone
 
