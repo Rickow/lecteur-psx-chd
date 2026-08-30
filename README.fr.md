@@ -105,6 +105,18 @@ python3 tools/chd-converter/iso2chd.py mon-jeu.cue      # → mon-jeu.chd
 python3 tools/chd-converter/iso2chd_app.py             # interface graphique (Tkinter)
 ```
 
+### Lanceurs de bureau (Linux)
+
+Ajoute les deux outils à ton menu d'applications (avec les bons chemins, sans édition) :
+
+```bash
+./install-launchers.sh
+```
+
+Tu trouveras alors **« Lecteur PSX (CHD) »** et **« Convertisseur CHD »** dans ton menu.
+(Des modèles `.desktop` sont aussi dans `serve/` et `tools/chd-converter/` si tu préfères
+éditer les chemins toi-même.)
+
 ## 📦 Formats supportés
 
 `.chd` (recommandé), `.pbp`, `.cue`+`.bin`, `.iso`, `.img`, `.mdf`, `.m3u`, plus `.sbi`

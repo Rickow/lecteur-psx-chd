@@ -103,6 +103,18 @@ python3 tools/chd-converter/iso2chd.py my-game.cue      # → my-game.chd
 python3 tools/chd-converter/iso2chd_app.py             # native GUI (Tkinter)
 ```
 
+### Desktop launchers (Linux)
+
+Add both tools to your application menu (with the correct paths — no manual editing):
+
+```bash
+./install-launchers.sh
+```
+
+You'll then find **“Lecteur PSX (CHD)”** and **“Convertisseur CHD”** in your app menu.
+(Ready-made `.desktop` templates are also in `serve/` and `tools/chd-converter/` if you
+prefer to edit the paths yourself.)
+
 ### Publish it with GitHub Pages
 
 The repo includes a landing page (`index.html`) and works on **GitHub Pages** out of the box:
