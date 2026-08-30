@@ -1,33 +1,33 @@
-# Convertisseur ISO/BIN/CUE → CHD
+# ISO/BIN/CUE → CHD converter
 
-Convertit vos images de disque (`.cue`, `.bin`, `.iso`, `.gdi`, `.toc`, `.nrg`) au format
-**CHD** (compressé, idéal pour ce lecteur) en s'appuyant sur **`chdman`** (outil MAME).
+Converts your disc images (`.cue`, `.bin`, `.iso`, `.gdi`, `.toc`, `.nrg`) to the **CHD**
+format (compressed, ideal for this player) using **`chdman`** (a MAME tool).
 
-## Prérequis
+## Requirements
 
-`chdman` :
-- Debian/Ubuntu : `sudo apt install mame-tools`
-- Fedora : `sudo dnf install mame-tools` · Arch : `sudo pacman -S mame-tools`
-- macOS : `brew install rom-tools`
+`chdman`:
+- Debian/Ubuntu: `sudo apt install mame-tools`
+- Fedora: `sudo dnf install mame-tools` · Arch: `sudo pacman -S mame-tools`
+- macOS: `brew install rom-tools`
 
-Pour l'interface native (`iso2chd_app.py`) : aussi `python3-tk`
+For the native GUI (`iso2chd_app.py`), also `python3-tk`
 (`sudo apt install python3-tk`).
 
-## Trois façons de l'utiliser
+## Three ways to use it
 
-| Fichier | Usage |
+| File | Usage |
 |---|---|
-| **`iso2chd.py`** | ligne de commande (lot, récursif, options) |
-| **`iso2chd_app.py`** | fenêtre native (Tkinter) : explorateur + barre de progression |
-| **`iso2chd_gui.py`** | interface web locale (aucune dépendance graphique) |
+| **`iso2chd.py`** | command line (batch, recursive, options) |
+| **`iso2chd_app.py`** | native window (Tkinter): file browser + progress bar |
+| **`iso2chd_gui.py`** | local web UI (no GUI dependency) |
 
 ```bash
-python3 iso2chd.py mon-jeu.cue                 # → mon-jeu.chd
-python3 iso2chd.py /mes/roms -r -o /sortie     # tout un dossier, récursif
-python3 iso2chd.py disque.bin                  # .bin isolé → cue temporaire auto
-python3 iso2chd_app.py                         # interface fenêtrée
+python3 iso2chd.py my-game.cue                 # → my-game.chd
+python3 iso2chd.py /my/roms -r -o /out         # a whole folder, recursive
+python3 iso2chd.py disc.bin                    # lone .bin → automatic temp cue
+python3 iso2chd_app.py                         # windowed UI
 ```
 
-Détection intelligente : un `.bin` référencé par un `.cue` est géré via le `.cue` ; un
-`.bin` isolé reçoit un cue temporaire automatique. Vérification SHA1 optionnelle
-(`--verify`). `python3 iso2chd.py --help` pour toutes les options.
+Smart detection: a `.bin` referenced by a `.cue` is handled via the `.cue`; a lone `.bin`
+gets an automatic temporary cue. Optional SHA1 verification (`--verify`).
+Run `python3 iso2chd.py --help` for all options.

@@ -1,142 +1,142 @@
-# Architecture & défis techniques
+*(English version — [Version française](architecture.fr.md))*
 
-Ce document détaille **comment ça marche** et surtout **les problèmes rencontrés et leurs
-solutions** — l'essentiel de l'effort de ce projet.
+# Architecture & technical challenges
 
-## Vue d'ensemble
+This document explains **how it works** and, above all, **the problems encountered and how
+they were solved** — the bulk of the effort behind this project.
 
-Le lecteur est **une seule page HTML** qui embarque, en base64 :
-- le **core pcsx_rearmed** compilé en WebAssembly (`.js` + `.wasm`) ;
-- le moteur **Nostalgist.js** (UMD) qui pilote le core dans le navigateur.
+## Overview
 
-Un **service worker** (`sw.js`) fournit le hors-ligne **et** les en-têtes d'isolation
-(COOP/COEP) nécessaires au multi-threading. Cible principale : **iPhone en PWA** (Safari).
+The player is **a single HTML page** that embeds, as base64:
+- the **pcsx_rearmed core** compiled to WebAssembly (`.js` + `.wasm`);
+- the **Nostalgist.js** engine (UMD) which drives the core in the browser.
+
+A **service worker** (`sw.js`) provides offline support **and** the isolation headers
+(COOP/COEP) required for multi-threading. Primary target: **iPhone as a PWA** (Safari).
 
 ```
-┌──────────────────── navigateur ────────────────────┐
-│  Thread principal (UI, canvas, IndexedDB, fichiers) │
-│     │  transfert OffscreenCanvas + proxy syscalls   │
+┌──────────────────── browser ───────────────────────┐
+│  Main thread (UI, canvas, IndexedDB, files)         │
+│     │  OffscreenCanvas transfer + syscall proxying  │
 │     ▼                                                │
 │  em-pthread  ──►  RetroArch + pcsx_rearmed (WASM)    │
-│                   rendu WebGL2, audio AudioWorklet   │
+│                   WebGL2 rendering, AudioWorklet     │
 └──────────────────────────────────────────────────────┘
 ```
 
-## Pourquoi un core *threadé* ?
+## Why a *threaded* core?
 
-pcsx_rearmed en émulation web n'a pas de dynarec (iOS interdit le JIT) → interpréteur.
-Le build threadé (`PROXY_TO_PTHREAD`) sort l'émulateur du thread UI (fluidité) et permet
-le rendu via **OffscreenCanvas**. Cela impose **SharedArrayBuffer**, donc un **contexte
-isolé** (COOP/COEP).
+Web pcsx_rearmed has no dynarec (iOS forbids JIT) → interpreter. The threaded build
+(`PROXY_TO_PTHREAD`) moves the emulator off the UI thread (smoothness) and enables
+rendering via **OffscreenCanvas**. This requires **SharedArrayBuffer**, hence a
+**cross-origin isolated** context (COOP/COEP).
 
 ---
 
-## Les défis rencontrés (et résolus)
+## The challenges (and their solutions)
 
-### 1. COOP/COEP sans serveur spécial
-`SharedArrayBuffer` n'est disponible que si `crossOriginIsolated === true`, ce qui exige
-les en-têtes `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy:
-require-corp`. Un hébergeur statique ne les envoie pas forcément.
+### 1. COOP/COEP without a special server
+`SharedArrayBuffer` is only available when `crossOriginIsolated === true`, which requires
+the headers `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy:
+require-corp`. A static host does not necessarily send them.
 
-**Solution :** le **service worker** (`sw.js`) réécrit les réponses pour ajouter ces
-en-têtes (pattern *coi-serviceworker*), fusionné avec le cache hors-ligne. L'app recharge
-une fois au premier lancement pour obtenir l'isolation.
-⚠️ Ne fonctionne qu'en **https** (ou `localhost`) — jamais en `file://`.
+**Solution:** the **service worker** (`sw.js`) rewrites responses to add those headers
+(the *coi-serviceworker* pattern), merged with the offline cache. The app reloads once on
+first launch to obtain isolation.
+⚠️ Only works over **https** (or `localhost`) — never `file://`.
 
-### 2. Charger un core threadé **inliné** (blob)
-Le core est embarqué (pas servi comme fichier). Or emscripten (ES6 + pthreads) crée ses
-workers ainsi : `new Worker(new URL("pcsx_rearmed_libretro.js", import.meta.url), {type:
-"module"})`. Chargé depuis un **blob**, cela échoue de deux façons :
-- `import.meta.url` d'un blob n'est **pas une base d'URL valide** → `Invalid base URL` ;
-- un **module worker refuse un blob sans type MIME** (celui de Nostalgist est sans type).
+### 2. Loading an **inlined** (blob) threaded core
+The core is embedded (not served as a file). But emscripten (ES6 + pthreads) spawns its
+workers with: `new Worker(new URL("pcsx_rearmed_libretro.js", import.meta.url), {type:
+"module"})`. Loaded from a **blob**, this fails two ways:
+- a blob's `import.meta.url` is **not a valid URL base** → `Invalid base URL`;
+- a **module worker rejects a blob with no MIME type** (Nostalgist's blob has none).
 
-**Solution :** l'app publie `globalThis.__PSX_CORE_URL = URL.createObjectURL(blob {type:
-"text/javascript"})`, et un patch du core (`build/patch_core.py`) fait pointer les workers
-pthread **et** l'AudioWorklet dessus. (WORKERFS lui aussi référencé mais inutilisé — voir §8.)
+**Solution:** the app publishes `globalThis.__PSX_CORE_URL = URL.createObjectURL(blob
+{type: "text/javascript"})`, and a core patch (`build/patch_core.py`) points the pthread
+workers **and** the AudioWorklet at it. (WORKERFS is also referenced but unused — see §8.)
 
-### 3. Rendu WebGL2 depuis le worker (OffscreenCanvas)
-RetroArch crée son thread de rendu et lui **transfère le canvas** (`transferControlToOffscreen`),
-puis `emscripten_webgl_create_context("#canvas")` dans le pthread. Chaque thread a sa
-**propre table** de contextes WebGL (`GL.contexts`, indexée par `canvas.id`). Un contexte
-détruit depuis un autre thread que celui qui l'a créé faisait planter le thread de rendu
-(`Cannot read properties of undefined (reading 'GLctx')`).
+### 3. WebGL2 rendering from the worker (OffscreenCanvas)
+RetroArch creates its render thread and **transfers the canvas** to it
+(`transferControlToOffscreen`), then `emscripten_webgl_create_context("#canvas")` inside
+the pthread. Each thread has its **own table** of WebGL contexts (`GL.contexts`, keyed by
+`canvas.id`). Destroying a context from a thread other than the one that created it crashed
+the render thread (`Cannot read properties of undefined (reading 'GLctx')`).
 
-**Solution :** garde-fou dans `GL.deleteContext` (patch) : si le contexte n'est pas dans
-ce thread, on ne plante pas. Le rendu survit.
+**Solution:** a guard in `GL.deleteContext` (patch): if the context isn't in this thread,
+don't crash. Rendering survives.
 
-**Limite connue (Brave/Chromium) :** si l'accélération GPU est désactivée (fréquent sous
-Linux — `brave://gpu` affiche `WebGL: Disabled`), `getContext('webgl2')` renvoie `null` →
-écran noir. Ce n'est **pas** un bug du lecteur (Firefox fonctionne). L'app détecte
-l'absence de WebGL2 et affiche un message clair. Correctif Brave :
-`brave://flags/#ignore-gpu-blocklist` → *Enabled*.
+**Known limitation (Brave/Chromium):** if GPU acceleration is disabled (common on Linux —
+`chrome://gpu` shows `WebGL: Disabled`), `getContext('webgl2')` returns `null` → black
+screen. This is **not** a player bug (Firefox works). The app detects missing WebGL2 and
+shows a clear message. Fix: `chrome://flags/#ignore-gpu-blocklist` → *Enabled*.
 
-### 4. API Nostalgist absentes du core récent
-Nostalgist appelait des API emscripten disparues du core threadé :
-- `Module.setCanvasSize(...)` → `TypeError` non rattrapé (le `catch` ne gérait que les
-  `DOMException`) → échec du lancement. **Solution :** `resize()` rendu tolérant (repli
-  sur `canvas.setAttribute`, ne lève plus).
-- `JSEvents.eventHandlers` (gestion clavier) → `JSEvents` est `undefined` sur le thread
-  principal en mode threadé. **Solution :** gardes défensives (`fireKeyboardEvent`,
+### 4. Nostalgist APIs missing from the recent core
+Nostalgist called emscripten APIs that are gone from the threaded core:
+- `Module.setCanvasSize(...)` → an unhandled `TypeError` (the `catch` only handled
+  `DOMException`) → launch failure. **Solution:** made `resize()` tolerant (falls back to
+  `canvas.setAttribute`, never throws).
+- `JSEvents.eventHandlers` (keyboard handling) → `JSEvents` is `undefined` on the main
+  thread in threaded mode. **Solution:** defensive guards (`fireKeyboardEvent`,
   `updateKeyboardEventHandlers`, `exit`).
 
-### 5. Contrôles tactiles en mode threadé
-Le pad à l'écran passait par `JSEvents` (raccourci interne) → inopérant en threadé.
+### 5. Touch controls in threaded mode
+The on-screen pad went through `JSEvents` (an internal shortcut) → inoperative when threaded.
 
-**Solution :** dispatcher un **vrai `KeyboardEvent`** sur le canvas. RetroArch écoute le
-clavier sur `"#canvas"` (`emscripten_set_keydown_callback`, driver `rwebinput`) et lit le
-champ `event.code` → un `KeyboardEvent` synthétique avec le bon `code` commande le jeu.
+**Solution:** dispatch a **real `KeyboardEvent`** on the canvas. RetroArch listens for the
+keyboard on `"#canvas"` (`emscripten_set_keydown_callback`, the `rwebinput` driver) and
+reads `event.code` → a synthetic `KeyboardEvent` with the right `code` drives the game.
 
-### 6. Sauvegardes d'état + SharedArrayBuffer + IndexedDB
-En mode threadé, l'état renvoyé par `saveState()` est adossé à la **SharedArrayBuffer**
-(tas WASM partagé). Or **IndexedDB refuse de stocker une vue SharedArrayBuffer**
-(`DataCloneError`). Résultat : « Sauver état » échouait silencieusement, alors que
-« Exporter état » marchait (le `Blob` d'export **copie** les octets).
+### 6. Save states + SharedArrayBuffer + IndexedDB
+In threaded mode, the state returned by `saveState()` is backed by the **SharedArrayBuffer**
+(shared WASM heap). But **IndexedDB refuses to store a SharedArrayBuffer view**
+(`DataCloneError`). As a result "Save state" failed silently, while "Export state" worked
+(the export `Blob` **copies** the bytes).
 
-**Solution :** copier dans un `ArrayBuffer` normal avant stockage
-(`new Uint8Array(view)` si `view.buffer instanceof SharedArrayBuffer`), centralisé dans
-la fonction de stockage.
+**Solution:** copy into a regular `ArrayBuffer` before storing
+(`new Uint8Array(view)` when `view.buffer instanceof SharedArrayBuffer`), centralised in
+the storage function.
 
-### 7. Mémoire : les gros jeux (FF7/FF8) faisaient crasher l'onglet
-Le disque était copié **2 à 3 fois** en RAM au chargement (lecture en ArrayBuffer, puis
-`getUint8Array` → `createDataFile` → `readFile` → `writeFile` côté Nostalgist) → pic de
-~1 Go pour un CD de FF (~450 Mo compressé) → Safari iOS tue l'onglet.
+### 7. Memory: big games (FF7/FF8) crashed the tab
+The disc was copied **2–3 times** in RAM on load (read into an ArrayBuffer, then
+`getUint8Array` → `createDataFile` → `readFile` → `writeFile` on Nostalgist's side) → a
+~1 GB spike for a FF disc (~450 MB compressed) → iOS Safari kills the tab.
 
-**Solution :** l'app passe l'objet `File` (non lu en RAM) et un `writeFile` patché
-**écrit le disque par morceaux de 8 Mo** directement dans le système de fichiers. Pic
-mémoire ≈ **1× la taille du disque**. (Le CHD étant compressé, un CD PS1 tient largement
-en mémoire sur iPhone.)
+**Solution:** the app passes the `File` object (not read into RAM) and a patched `writeFile`
+**writes the disc in 8 MB chunks** directly into the filesystem. Peak memory ≈ **1× the
+disc size**. (Being compressed, a PS1 CHD fits comfortably in an iPhone's memory.)
 
-### 8. WORKERFS : un cul-de-sac (documenté)
-L'idée initiale était le **streaming WORKERFS** (lire le CHD par tranches sans le charger).
-Vérifié dans le core : les syscalls fichiers d'un pthread sont **proxifiés vers le thread
-principal** (`__syscall_openat → proxyToMainThread`), or `WORKERFS.mount` exige
-`ENVIRONMENT_IS_WORKER` + `FileReaderSync` (worker uniquement). **Incompatible** avec ce
-build RetroArch. Le mécanisme *lazy* alternatif (`createLazyFile`) a été **prouvé
-faisable** (XHR synchrone *Range* « binary-string » sur blob URL → 206 + octets corrects
-sous COEP) mais reste à implémenter (utile surtout pour le multi-disque).
+### 8. WORKERFS: a dead-end (documented)
+The initial idea was **WORKERFS streaming** (reading the CHD in slices without loading it).
+Verified in the core: a pthread's file syscalls are **proxied to the main thread**
+(`__syscall_openat → proxyToMainThread`), yet `WORKERFS.mount` requires
+`ENVIRONMENT_IS_WORKER` + `FileReaderSync` (worker only). **Incompatible** with this
+RetroArch build. The alternative *lazy* mechanism (`createLazyFile`) was **proven feasible**
+(synchronous "binary-string" *Range* XHR on a blob URL → 206 + correct bytes under COEP) but
+is not implemented yet (mostly useful for multi-disc).
 
 ### 9. CHD & SBI
-- **CHD** : format compressé par *hunks*, décompressés à la demande par libchdr → faible
-  empreinte de travail.
-- **SBI** (protection *libcrypt*, jeux PAL) : pcsx_rearmed cherche le `.sbi` à côté de
-  l'image, **même nom de base**. L'app écrit le `.sbi` en `game.sbi` pour matcher
-  `game.chd` (sélectionner les deux fichiers ensemble).
+- **CHD**: a hunk-compressed format, hunks decompressed on demand by libchdr → small working
+  footprint.
+- **SBI** (libcrypt protection, PAL games): pcsx_rearmed looks for the `.sbi` next to the
+  image, **same base name**. The app writes the `.sbi` as `game.sbi` to match `game.chd`
+  (select both files together).
 
 ---
 
-## Confort / robustesse
+## Convenience / robustness
 
-- **Historique** « Jeux récents » (métadonnées seulement, pas les gros CHD → 0 stockage) ;
-  reprise via re-sélection du fichier + rechargement automatique de la sauvegarde.
-- **Sauvegarde automatique** toutes les 30 s (clé séparée, n'écrase pas la sauvegarde
-  manuelle) — filet anti-crash ; la reprise charge la plus récente.
-- **« Libérer la mémoire »** : sauvegarde + rechargement de page (RAM remise à zéro pour
-  changer de jeu ; les sauvegardes persistent en IndexedDB).
+- **"Recent games" history** (metadata only, not the large CHDs → no storage cost); resume
+  by re-selecting the file + automatic save reload.
+- **Auto-save** every 30 s (separate key, does not overwrite the manual save) — a crash
+  safety net; resume loads the most recent one.
+- **"Free memory"**: save + page reload (RAM reset to switch games; saves persist in
+  IndexedDB).
 
-## Limites & pistes
+## Limitations & directions
 
-- **Mono-disque** pour l'instant ; le **multi-disque** (FF7 = 3 CD, changement de CD en
-  jeu via `DISK_NEXT`) est la prochaine étape.
-- Le **lazy loading** (§8) réduirait encore la RAM et faciliterait le multi-disque.
-- **Interpréteur** (pas de dynarec) : parfait pour FF et la majorité des jeux ; les gros
-  3D peuvent parfois ne pas tenir le plein framerate.
+- **Single-disc** for now; **multi-disc** (FF7 = 3 CDs, in-game switching via `DISK_NEXT`)
+  is the next step.
+- **Lazy loading** of the CHD (§8) would further reduce RAM and ease multi-disc.
+- **Interpreter** (no dynarec): perfect for FF and most games; heavy 3D titles may sometimes
+  exceed the budget.

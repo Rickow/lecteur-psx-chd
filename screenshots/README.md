@@ -1,9 +1,9 @@
-# Captures d'écran
+# Screenshots
 
-Déposez ici vos captures et référencez-les dans le README principal, par ex. :
+Drop your screenshots here and reference them in the main README, e.g.:
 
-    ![Menu du lecteur](screenshots/menu.png)
-    ![En jeu](screenshots/ingame.png)
+    ![Player menu](screenshots/menu.png)
+    ![In game](screenshots/ingame.png)
 
-Suggestions : l'écran d'accueil (menu + historique), une partie en cours, la manette
-tactile en mode portrait sur iPhone.
+Suggestions: the home screen (menu + history), a game running, the touch gamepad in
+portrait mode on iPhone.
