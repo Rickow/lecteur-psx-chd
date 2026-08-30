@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecteur PSX CHD — PlayStation emulator in a web page</title>
+<meta name="description" content="A PlayStation (PS1) emulator in a single web page. Load a .chd and play — video, sound, touch controls, save states. Installable as a PWA on iPhone.">
+<style>
+  :root{--bg:#0a0b0e;--panel:#14171d;--panel2:#1c2027;--bd:#2a303b;--tx:#e8ebf1;--dim:#9aa3b2;
+        --acc:#e8c15a;--acc2:#4c9df0;--ok:#3fb950}
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:
+    radial-gradient(120% 80% at 50% -10%,#161a22 0%,var(--bg) 60%);color:var(--tx);
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 1.2rem}
+  a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
+  .wrap{width:100%;max-width:860px}
+  header{text-align:center;padding:4rem 0 2.5rem}
+  .crest{letter-spacing:.35em;text-transform:uppercase;font-size:.72rem;color:var(--dim)}
+  h1{font-size:clamp(2.4rem,7vw,3.6rem);margin:.4rem 0 .2rem;font-weight:800;letter-spacing:.02em}
+  .tag{color:var(--dim);font-size:1.05rem;max-width:600px;margin:.4rem auto 0}
+  .cta{display:inline-flex;align-items:center;gap:.5rem;margin-top:1.8rem;background:var(--acc);
+    color:#231b03;font-weight:700;font-size:1.15rem;padding:.85rem 1.8rem;border-radius:12px;
+    box-shadow:0 8px 30px rgba(232,193,90,.25)}
+  .cta:hover{text-decoration:none;background:#f0cd6d}
+  .sub-cta{display:block;margin-top:.9rem;color:var(--dim);font-size:.9rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.9rem;margin:2rem 0}
+  .card{background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:1.1rem 1.2rem}
+  .card .ic{font-size:1.4rem}
+  .card h3{margin:.5rem 0 .2rem;font-size:1rem}
+  .card p{margin:0;color:var(--dim);font-size:.9rem}
+  section{margin:2.4rem 0}
+  h2{font-size:1.25rem;border-bottom:1px solid var(--bd);padding-bottom:.5rem}
+  ol{padding-left:1.2rem}ol li{margin:.3rem 0}
+  code{background:var(--panel2);padding:.1rem .4rem;border-radius:5px;font-size:.88em}
+  .note{background:var(--panel);border:1px solid var(--bd);border-left:3px solid var(--acc2);
+    border-radius:10px;padding:.9rem 1.1rem;color:var(--dim);font-size:.92rem}
+  .links{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1rem}
+  .links a{background:var(--panel2);border:1px solid var(--bd);border-radius:9px;padding:.5rem .9rem;color:var(--tx)}
+  .links a:hover{border-color:var(--acc2);text-decoration:none}
+  .disclaim{color:#c98b8b;font-size:.85rem}
+  footer{margin:3rem 0 2rem;color:var(--dim);font-size:.85rem;text-align:center;border-top:1px solid var(--bd);padding-top:1.4rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="crest">Emulator · PlayStation</div>
+    <h1>Lecteur PSX <span style="color:var(--acc)">CHD</span></h1>
+    <p class="tag">A PlayStation (PS1) emulator in a single web page. Load a
+      <code>.chd</code> and play — right in your browser, or installed on your iPhone.</p>
+    <a class="cta" href="lecteur-psx.html">▶ Play now</a>
+    <span class="sub-cta">Nothing is uploaded — everything stays on your device.</span>
+  </header>
+
+  <div class="grid">
+    <div class="card"><div class="ic">📱</div><h3>iPhone PWA</h3><p>Add to Home Screen and play offline, full-screen.</p></div>
+    <div class="card"><div class="ic">🕹️</div><h3>Touch gamepad</h3><p>On-screen D-pad, face buttons, L/R, sticks — plus keyboard.</p></div>
+    <div class="card"><div class="ic">💾</div><h3>Save states</h3><p>In-page saves, 30 s auto-save, export/import, memory card.</p></div>
+    <div class="card"><div class="ic">🧠</div><h3>Big games</h3><p>Memory-optimised — Final Fantasy VII/VIII playable on iPhone.</p></div>
+    <div class="card"><div class="ic">🗜️</div><h3>CHD converter</h3><p>Turn your ISO/BIN/CUE into compact <code>.chd</code> files.</p></div>
+    <div class="card"><div class="ic">🔓</div><h3>Open source</h3><p>GPL-3.0, reproducible build, fully documented.</p></div>
+  </div>
+
+  <section>
+    <h2>Getting started</h2>
+    <ol>
+      <li>Get a game <strong>you own</strong>, ideally as a <code>.chd</code>
+        (<a href="tools/chd-converter/">convert your discs</a> if needed).</li>
+      <li>Click <a href="lecteur-psx.html"><strong>Play now</strong></a> → <em>Load a disc</em> → pick your file.</li>
+      <li>On iPhone: open in <strong>Safari</strong> → <strong>Share</strong> → <strong>Add to Home Screen</strong>.</li>
+    </ol>
+    <p class="note">💡 A BIOS is optional (the player uses HLE by default). If the screen
+      stays black on Brave/Chrome, GPU acceleration is likely disabled — enable
+      <code>chrome://flags/#ignore-gpu-blocklist</code>, or use Firefox.</p>
+  </section>
+
+  <section>
+    <h2>Learn more</h2>
+    <div class="links">
+      <a href="README.md">📖 README</a>
+      <a href="docs/architecture.md">🏗️ Architecture &amp; solutions</a>
+      <a href="CREDITS.md">🙏 Credits &amp; licences</a>
+      <a href="build/">🔧 Build from source</a>
+      <a href="README.fr.md">🇫🇷 Français</a>
+    </div>
+  </section>
+
+  <p class="disclaim">⚠️ No BIOS and no games are provided. Only use backups of your own
+    games. “PlayStation” is a trademark of Sony Interactive Entertainment; this project is
+    not affiliated with Sony.</p>
+
+  <footer>
+    Built on <a href="https://github.com/notaz/pcsx_rearmed">pcsx_rearmed</a>,
+    <a href="https://github.com/libretro/RetroArch">RetroArch</a>,
+    <a href="https://github.com/arianrhodsandlot/nostalgist">Nostalgist.js</a>,
+    <a href="https://github.com/rtissera/libchdr">libchdr</a> and
+    <a href="https://emscripten.org/">Emscripten</a>. — GPL-3.0
+  </footer>
+</div>
+
+<script>
+  // Pré-enregistre le service worker : quand l'utilisateur clique « Play », le lecteur
+  // démarre déjà en contexte isolé (COOP/COEP fournis par sw.js), sans rechargement.
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  }
+</script>
+</body>
+</html>

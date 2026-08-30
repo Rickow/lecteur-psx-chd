@@ -99,6 +99,17 @@ python3 tools/chd-converter/iso2chd.py my-game.cue      # → my-game.chd
 python3 tools/chd-converter/iso2chd_app.py             # native GUI (Tkinter)
 ```
 
+### Publish it with GitHub Pages
+
+The repo includes a landing page (`index.html`) and works on **GitHub Pages** out of the box:
+
+1. Repo **Settings → Pages → Source: `main` / root**, save.
+2. Your site goes live at `https://<user>.github.io/<repo>/` (the landing page), with the
+   player at `…/lecteur-psx.html`.
+
+GitHub Pages doesn't send COOP/COEP, but the bundled `sw.js` supplies them (the landing
+page pre-registers it), so the threaded core runs isolated.
+
 ## 📦 Supported formats
 
 `.chd` (recommended), `.pbp`, `.cue`+`.bin`, `.iso`, `.img`, `.mdf`, `.m3u`, plus `.sbi`
