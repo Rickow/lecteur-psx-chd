@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="-10%" r="120%">
+      <stop offset="0%" stop-color="#1a1f29"/>
+      <stop offset="60%" stop-color="#0a0b0e"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f0d074"/>
+      <stop offset="100%" stop-color="#d9a83f"/>
+    </linearGradient>
+    <linearGradient id="disc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2b3140"/>
+      <stop offset="100%" stop-color="#161a22"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="420" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="1199" height="419" fill="none" stroke="#2a303b"/>
+
+  <!-- disque stylisé (droite) -->
+  <g transform="translate(945,210)" opacity="0.95">
+    <circle r="150" fill="url(#disc)" stroke="#2a303b" stroke-width="2"/>
+    <circle r="150" fill="none" stroke="#4c9df0" stroke-width="2" opacity="0.25"/>
+    <circle r="118" fill="none" stroke="#3a4150" stroke-width="1"/>
+    <circle r="92" fill="none" stroke="#3a4150" stroke-width="1"/>
+    <circle r="66" fill="none" stroke="#3a4150" stroke-width="1"/>
+    <circle r="40" fill="#0a0b0e" stroke="#2a303b" stroke-width="2"/>
+    <circle r="14" fill="#161a22" stroke="#2a303b"/>
+    <path d="M0 -150 A150 150 0 0 1 130 -75" fill="none" stroke="#e8c15a" stroke-width="3" opacity="0.8" stroke-linecap="round"/>
+  </g>
+
+  <!-- texte (gauche) -->
+  <text x="90" y="120" fill="#9aa3b2" font-size="20" letter-spacing="8" font-weight="600">EMULATOR · PLAYSTATION</text>
+  <text x="86" y="205" font-size="88" font-weight="800" letter-spacing="1">
+    <tspan fill="#e8ebf1">Lecteur PSX </tspan><tspan fill="url(#gold)">CHD</tspan>
+  </text>
+  <text x="90" y="250" fill="#9aa3b2" font-size="24">A PlayStation emulator in a single web page — playable on iPhone.</text>
+
+  <!-- chips -->
+  <g font-size="18" font-weight="600">
+    <g transform="translate(90,290)">
+      <rect width="150" height="40" rx="20" fill="#14171d" stroke="#2a303b"/>
+      <text x="75" y="26" fill="#e8ebf1" text-anchor="middle">📱 iPhone PWA</text>
+    </g>
+    <g transform="translate(252,290)">
+      <rect width="176" height="40" rx="20" fill="#14171d" stroke="#2a303b"/>
+      <text x="88" y="26" fill="#e8ebf1" text-anchor="middle">🕹️ Touch gamepad</text>
+    </g>
+    <g transform="translate(440,290)">
+      <rect width="150" height="40" rx="20" fill="#14171d" stroke="#2a303b"/>
+      <text x="75" y="26" fill="#e8ebf1" text-anchor="middle">💾 Save states</text>
+    </g>
+    <g transform="translate(90,342)">
+      <rect width="128" height="40" rx="20" fill="#14171d" stroke="#2a303b"/>
+      <text x="64" y="26" fill="#e8ebf1" text-anchor="middle">🗜️ CHD</text>
+    </g>
+    <g transform="translate(230,342)">
+      <rect width="196" height="40" rx="20" fill="#1a2030" stroke="#33507a"/>
+      <text x="98" y="26" fill="#8fc0ff" text-anchor="middle">🔓 Open source · GPL-3.0</text>
+    </g>
+  </g>
+</svg>

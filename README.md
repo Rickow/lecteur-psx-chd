@@ -11,8 +11,10 @@ Load a game as a **`.chd`** file (or `.cue/.bin`, `.iso`, `.pbp`…) and play: v
 > ⚙️ This project **assembles** outstanding open-source building blocks (see
 > [CREDITS.md](CREDITS.md)). All emulation credit goes to their authors.
 
-> 📸 *Add your screenshots to [`screenshots/`](screenshots/) and reference them here
-> (e.g. the home screen, in-game, the on-screen gamepad on iPhone).*
+![Lecteur PSX CHD](screenshots/banner.svg)
+
+> 📸 *Real screenshots welcome — add them to [`screenshots/`](screenshots/) (home screen,
+> in-game, the touch gamepad on iPhone) and reference them here.*
 
 ---
 

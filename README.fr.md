@@ -12,8 +12,10 @@ n'est envoyé sur un serveur.
 > ⚙️ Ce projet **assemble** des briques open source exceptionnelles (voir
 > [CREDITS.md](CREDITS.md)). Le mérite de l'émulation revient à leurs auteurs.
 
-> 📸 *Ajoutez vos captures dans [`screenshots/`](screenshots/) puis référencez-les ici
-> (ex. l'écran d'accueil, une partie en cours, la manette tactile sur iPhone).*
+![Lecteur PSX CHD](screenshots/banner.svg)
+
+> 📸 *Les vraies captures sont les bienvenues — déposez-les dans [`screenshots/`](screenshots/)
+> (écran d'accueil, en jeu, manette tactile sur iPhone) et référencez-les ici.*
 
 ---
 
