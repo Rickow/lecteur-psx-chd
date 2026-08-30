@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Convertisseur CHD (ISO/BIN/CUE → CHD)
+Comment=Convertit des images CD/DVD en .chd via chdman
+Exec=python3 "/PATH/VERS/lecteur-psx-chd/tools/chd-converter/iso2chd_app.py"
+Path=/PATH/VERS/lecteur-psx-chd/tools/chd-converter
+Icon=media-optical
+Terminal=false
+Categories=Utility;

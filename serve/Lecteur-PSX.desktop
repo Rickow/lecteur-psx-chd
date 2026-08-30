@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Lecteur PSX (CHD)
+Comment=Sert le lecteur PSX en local (COOP/COEP) et ouvre le navigateur
+Exec=python3 "/PATH/VERS/lecteur-psx-chd/serve/lancer_lecteur_psx.py"
+Path=/PATH/VERS/lecteur-psx-chd/serve
+Icon=applications-games
+Terminal=true
+Categories=Game;

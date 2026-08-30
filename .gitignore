@@ -1,0 +1,21 @@
+# Espace de build (cloné/compilé par build/build.sh)
+build/.build-workspace/
+
+# Python
+__pycache__/
+*.pyc
+
+# Artefacts de test / temporaires
+*.chd
+*.bin
+*.iso
+*.cue
+*.sbi
+*.srm
+*.state
+scph*.bin
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
