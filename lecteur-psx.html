@@ -834,7 +834,7 @@
 			menu_navigation_browser_filter_supported_extensions_enable: false,
 			notification_show_when_menu_is_alive: true,
 			savestate_auto_load: true,
-			savestate_thumbnail_enable: true,
+			savestate_thumbnail_enable: false,
 			stdin_cmd_enable: true,
 			video_shader_enable: true,
 			input_audio_mute: "nul",
@@ -3509,10 +3509,12 @@ try {
     var fpsOn=false; try{ fpsOn=(localStorage.getItem('psx_fps')==='1'); }catch(_){ }
     var sticksOn=true; try{ sticksOn=(localStorage.getItem('psx_sticks')!=='0'); }catch(_){ }
     var keepDiscs=false; try{ keepDiscs=(localStorage.getItem('psx_keepdiscs')==='1'); }catch(_){ }
-    var pendingStoreFiles=null;   // fichiers de la sélection en cours, à stocker après lancement si keepDiscs
+    var lastLoadedFiles=null;   // fichiers du dernier jeu chargé (toujours mémorisés → permet de garder le jeu EN COURS quand on active le toggle)
     // Config RetroArch au lancement (binds + compteur FPS de RetroArch si activé)
     var FPS_FONT_SIZE=48;   // taille de l'overlay FPS (l'overlay natif RetroArch est sinon minuscule)
-    function raCfg(){ var c=Object.assign({},BINDS); if(fpsOn){ c.fps_show=true; c.video_font_enable=true; c.video_font_size=FPS_FONT_SIZE; } return c; }
+    // savestate_thumbnail_enable=false : sinon saveState() attend AUSSI une miniature .png que
+    // pcsx_rearmed ne génère pas toujours → « fs timeout » alors que l'état est bien écrit (on n'utilise pas la miniature).
+    function raCfg(){ var c=Object.assign({},BINDS); c.savestate_thumbnail_enable=false; if(fpsOn){ c.fps_show=true; c.video_font_enable=true; c.video_font_size=FPS_FONT_SIZE; } return c; }
     // Active/désactive le compteur FPS EN DIRECT : réécrit fps_show dans la config + recharge la config.
     function applyFpsLive(){
       if(!ng) return false;
@@ -3579,15 +3581,22 @@ try {
         return true;
       }catch(e){ try{ await idbDel('disc:'+id); }catch(_){ } return e; }
     }
-    // Appelé après un lancement réussi : garde les fichiers du jeu courant si l'option est active (en tâche de fond).
-    async function maybeStoreDiscs(id, name, size){
-      if(!keepDiscs || !pendingStoreFiles) return;
-      var files=pendingStoreFiles; pendingStoreFiles=null;
-      try{ var existing=await getStoredDiscs(id); if(existing && existing.size===size){ await histSet(id,{hasDiscs:true}); return; } }catch(_){ }
-      log('Enregistrement des disques dans le navigateur… ('+(size/1048576).toFixed(0)+' Mo)','muted');
+    // Garde les fichiers d'un jeu dans le navigateur si l'option est active (en tâche de fond).
+    async function keepGameIfEnabled(id, name, size, files){
+      if(!keepDiscs || !files || !files.length) return;
+      try{ var existing=await getStoredDiscs(id); if(existing && existing.size===size){ await histSet(id,{hasDiscs:true}); renderHistory(); return; } }catch(_){ }
+      log('Enregistrement du jeu dans le navigateur… ('+(size/1048576).toFixed(0)+' Mo)','muted');
       var ok=await storeDiscsFor(id, name, size, files);
-      if(ok===true){ await histSet(id,{hasDiscs:true}); log('Disques gardés — reprise directe disponible.','ok'); }
-      else { await histSet(id,{hasDiscs:false}); log('Disques non gardés (espace navigateur insuffisant ?).','muted'); }
+      if(ok===true){ await histSet(id,{hasDiscs:true}); log('Jeu gardé en mémoire — reprise directe disponible.','ok'); }
+      else { await histSet(id,{hasDiscs:false}); log('Jeu non gardé (espace navigateur insuffisant ?).','muted'); }
+      renderHistory();
+    }
+    // Garde le jeu ACTUELLEMENT lancé (utilisé quand on active le toggle en cours de partie).
+    async function keepCurrentGame(){
+      if(!ng || !romId || !lastLoadedFiles || !lastLoadedFiles.length){ log('Aucun jeu chargé à garder — le prochain jeu chargé sera gardé.','muted'); return; }
+      var size=lastLoadedFiles.reduce(function(a,f){return a+(f.size||0);},0);
+      var meta=(await histGet()).find(function(x){return x.id===romId;});
+      await keepGameIfEnabled(romId, (meta&&meta.name)||curName||'jeu', (meta&&meta.size)||size, lastLoadedFiles);
     }
 
     // ---------- Historique (métadonnées seulement : noms/tailles, PAS les gros CHD → 0 stockage lourd) ----------
@@ -3601,7 +3610,7 @@ try {
     function stopAutoSave(){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } }
     function startAutoSave(){ stopAutoSave(); autoTimer=setInterval(async function(){
       if(!ng||busy) return;
-      try{ var r=await ng.saveState(); await idbSet('autostate:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,autoTs:Date.now()}); }catch(_){ }
+      try{ var r=await robustSaveState(); await idbSet('autostate:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,autoTs:Date.now()}); }catch(_){ }
     }, 30000); }
     // Reprise DIRECTE depuis les disques gardés : reconstruit des File et relance sans re-sélection.
     async function resumeFromStored(id){
@@ -3617,7 +3626,7 @@ try {
       var list=await histGet(); box.innerHTML='';
       if(!list.length) return;
       var storedId = keepDiscs ? await getStoredId() : null;
-      var t=document.createElement('div'); t.className='htitle'; t.textContent='Jeux récents'; box.appendChild(t);
+      var t=document.createElement('div'); t.className='htitle'; t.textContent=storedId?'En mémoire':'Jeux récents'; box.appendChild(t);
       list.forEach(function(m){
         var kept = (m.id===storedId);
         var row=document.createElement('div'); row.className='hrow';
@@ -3725,6 +3734,12 @@ try {
       if(!ng) return; await ng.loadState(data); await wait(250);
       try{ ng.sendCommand('LOAD_STATE'); }catch(_){ }
     }
+    // Sauvegarde d'état ROBUSTE : réessaie une fois si un « fs timeout » transitoire survient
+    // (le core met parfois un peu à écrire le fichier au tout premier save d'une session).
+    async function robustSaveState(){
+      try{ return await ng.saveState(); }
+      catch(e){ if(String(e&&(e.message||e)).indexOf('fs timeout')>=0){ await wait(500); return await ng.saveState(); } throw e; }
+    }
     function discNum(name){ var m=/[\(\[]?\s*(?:disc|disk|cd)\s*[:#\-]?\s*(\d+)/i.exec(name); return m?parseInt(m[1],10):null; }
     function sbiName(fsName){ return fsName.replace(/\.[^.]+$/,'.sbi'); }
     function updateDiscUI(){
@@ -3822,7 +3837,7 @@ try {
           var _prev=(await histGet()).find(function(x){return x.id===romId;})||{};
           var _man=await idbGet('state:'+romId), _aut=await idbGet('autostate:'+romId);
           await histAdd({id:romId,name:curName+' ('+discs.length+' CD)',size:totalSize,ext:'m3u',date:Date.now(),hasState:!!(_man||_aut),stateTs:_prev.stateTs||0,autoTs:_prev.autoTs||0,hasDiscs:_prev.hasDiscs||false});
-          maybeStoreDiscs(romId, curName+' ('+discs.length+' CD)', totalSize);
+          keepGameIfEnabled(romId, curName+' ('+discs.length+' CD)', totalSize, lastLoadedFiles);
           if(pendingResumeId===romId){ var _useAuto=_aut&&(!_man||(_prev.autoTs||0)>(_prev.stateTs||0)); var _st=_useAuto?_aut:(_man||_aut); if(_st){ await robustLoadState(_st); log('Reprise : sauvegarde '+(_useAuto?'auto':'manuelle')+' rechargée.','ok'); } }
         }catch(_){ }
         pendingResumeId=null; startAutoSave();
@@ -3867,7 +3882,7 @@ try {
           var _man=await idbGet('state:'+romId), _aut=await idbGet('autostate:'+romId);
           await histAdd({id:romId,name:mainFile.name,size:mainFile.size,ext:curExt,date:Date.now(),
             hasState:!!(_man||_aut), stateTs:_prev.stateTs||0, autoTs:_prev.autoTs||0, hasDiscs:_prev.hasDiscs||false});
-          maybeStoreDiscs(romId, mainFile.name, mainFile.size);
+          keepGameIfEnabled(romId, mainFile.name, mainFile.size, lastLoadedFiles);
           if(pendingResumeId===romId){
             var _useAuto=_aut&&(!_man||(_prev.autoTs||0)>(_prev.stateTs||0));
             var _st=_useAuto?_aut:(_man||_aut);
@@ -3884,7 +3899,7 @@ try {
     function webglAvailable(){ try{ var c=document.createElement('canvas'); return !!c.getContext('webgl2'); }catch(_){ return false; } }
     async function handleFiles(fileList){
       var files=Array.prototype.slice.call(fileList||[]); if(!files.length) return;
-      pendingStoreFiles = keepDiscs ? files.slice() : null;   // mémorise la sélection pour la garder après lancement
+      lastLoadedFiles = files.slice();   // toujours mémorisé (permet de garder ce jeu même si le toggle est activé plus tard)
       if(!webglAvailable()){ showLog(); showStatus('WebGL2 indisponible dans ce navigateur — l’image ne peut pas s’afficher.'); setProgress(0);
         log('WebGL est bloqué/désactivé → écran noir. Active l’accélération matérielle du GPU (Brave/Chrome : ouvre brave://flags/#ignore-gpu-blocklist → Enabled, puis redémarre), ou utilise Firefox.','err');
         log('Vérifie l’état sur brave://gpu (ligne WebGL).','muted'); return; }
@@ -3921,14 +3936,14 @@ try {
     }
     // « Libérer la mémoire » : sauvegarde l'état courant puis recharge la page (RAM remise à zéro ; sauvegardes conservées).
     document.getElementById('freemem').addEventListener('click', async function(){
-      try{ if(ng){ var r=await ng.saveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); } }catch(_){ }
+      try{ if(ng){ var r=await robustSaveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); } }catch(_){ }
       location.reload();
     });
     document.getElementById('eye').addEventListener('click', function(){ document.body.classList.toggle('chrome-off'); setTimeout(fit,30); });
     // Ouvre le sélecteur de disque — mais si un jeu est gardé en mémoire, prévient qu'il sera retiré.
     async function pickRom(){
       if(keepDiscs){ try{ var sid=await getStoredId(); if(sid){ var rec=await getStoredDiscs(sid); var nm=(rec&&rec.name)||'le jeu gardé';
-        if(!confirm('Charger un nouveau jeu retirera « '+nm+' » gardé en mémoire (reprise directe). Continuer ?')) return; } }catch(_){ } }
+        if(!confirm('Cela effacera « '+nm+' » actuellement en mémoire. Continuer ?')) return; } }catch(_){ } }
       document.getElementById('file-rom').click();
     }
     document.getElementById('pick').addEventListener('click', function(){ pickRom(); });
@@ -3952,9 +3967,9 @@ try {
         else if(act==='disc'){ if(isMulti&&discs.length>1){ await swapDisc((curDiscIndex+1)%discs.length); } }
         else if(act==='fps-toggle'){ toggleFps(); }
         else if(!ng){ log('Charge d\u2019abord un disque.','muted'); }
-        else if(act==='savestate'){ var r=await ng.saveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); log('État sauvegardé dans la page.','ok'); }
+        else if(act==='savestate'){ var r=await robustSaveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); log('État sauvegardé dans la page.','ok'); }
         else if(act==='loadstate'){ var st=await idbGet('state:'+romId); if(!st){ log('Aucun état en page pour ce jeu.'); } else { await robustLoadState(st); log('État rechargé.','ok'); } }
-        else if(act==='exportstate'){ var re=await ng.saveState(); download(re&&re.state?re.state:re, curName+'.state'); log('État exporté → '+curName+'.state','ok'); }
+        else if(act==='exportstate'){ var re=await robustSaveState(); download(re&&re.state?re.state:re, curName+'.state'); log('État exporté → '+curName+'.state','ok'); }
         else if(act==='importstate'){ document.getElementById('file-state').click(); }
         else if(act==='exportsram'){ var blob=await ng.saveSRAM(); download(blob, curName+'.srm'); log('Carte mémoire exportée → '+curName+'.srm','ok'); }
         else if(act==='importsram'){ document.getElementById('file-sram').click(); }
@@ -3971,8 +3986,8 @@ try {
       var _kc=document.getElementById('keep-discs');
       if(_kc){ _kc.checked=keepDiscs;
         _kc.addEventListener('change', async function(){ keepDiscs=_kc.checked; try{ localStorage.setItem('psx_keepdiscs', keepDiscs?'1':'0'); }catch(_){ }
-          if(keepDiscs){ log('Option activée : le prochain jeu chargé sera gardé pour la reprise directe.','ok'); }
-          else { await purgeStoredDiscs(); log('Disques retirés du navigateur.','muted'); }
+          if(keepDiscs){ log('Option activée : les jeux sont gardés pour la reprise directe.','ok'); await keepCurrentGame(); }
+          else { await purgeStoredDiscs(); log('Jeux retirés de la mémoire du navigateur.','muted'); }
           renderHistory(); }); }
       // Détection d'un crash lors d'un changement de disque (la page s'est rechargée pendant le swap).
       try{ var _sc=localStorage.getItem('psx_swapcrash'); if(_sc){ localStorage.removeItem('psx_swapcrash'); var _o=JSON.parse(_sc);
