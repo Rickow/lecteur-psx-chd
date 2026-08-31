@@ -63,8 +63,8 @@
   #loader .sub{font-size:.74rem;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;margin-top:-.5rem}
   #loader #continue-game{font:inherit;font-size:.98rem;font-weight:600;letter-spacing:.03em;padding:.8rem 1.5rem;border-radius:10px;cursor:pointer;color:#0a0a0a;background:var(--glow);border:none;max-width:92%;white-space:normal}
   #loader #pick{font:inherit;font-size:.9rem;letter-spacing:.06em;padding:.75rem 1.4rem;border-radius:10px;cursor:pointer;color:#0a0a0a;background:var(--glow);border:none}
-  /* Quand « Continuer » est visible, « Charger un disque » devient secondaire (contour). */
-  #loader.has-continue #pick{color:#e8e8e8;background:transparent;border:1px solid #3a4150}
+  #loader #clearmem{background:transparent;border:1px solid #2c323d;color:#8a93a2;border-radius:9px;padding:.5rem .9rem;font-size:.82rem;cursor:pointer;margin-top:.1rem;max-width:92%}
+  #loader #clearmem:hover{border-color:#4c9df0;color:#e6e9ef}
   #bios-row{font-size:.64rem;color:var(--dim);display:flex;gap:.5rem;align-items:center;justify-content:center;flex-wrap:wrap}
   #bios-row a{color:var(--glow);cursor:pointer;text-decoration:underline}
   #resume-game{background:#3fb950;border:none;color:#06210f;border-radius:10px;padding:.6rem 1.1rem;font-weight:600;font-size:.95rem;cursor:pointer}
@@ -82,7 +82,7 @@
     <div id="bar" aria-label="Contrôles">
       <span class="tag" id="tag">Lecteur PSX</span>
       <button data-act="menu" class="primary">Menu</button>
-      <button data-act="loadrom">Charger disque</button>
+      <button data-act="loadrom">Changer de jeu</button>
       <button data-act="disc" id="btn-disc" style="display:none">Disque 1/1</button>
       <button data-act="fs">Plein écran</button>
       <button data-act="pad">Manette</button>
@@ -105,6 +105,7 @@
       <div class="sub">Charge un disque depuis ton appareil</div>
       <button id="continue-game" style="display:none">▶ Continuer</button>
       <button id="pick">Charger un disque</button>
+      <button id="clearmem" style="display:none">🗑 Vider la mémoire pour lancer un autre jeu</button>
       <div id="bios-row">BIOS : <span id="bios-state">HLE (intégré)</span> · <a id="pick-bios">ajouter scph…bin</a></div>
       <div id="status" style="display:none">
         <div id="status-text"></div>
@@ -3584,11 +3585,13 @@ try {
     // Met à jour le bouton « Continuer — [titre] » de l'accueil : visible seulement si un jeu est gardé
     // en mémoire ET qu'aucun jeu ne tourne (sinon on utilise « ◀ Retour au jeu »).
     async function updateHomeButtons(){
-      var cont=document.getElementById('continue-game'); if(!cont) return;
-      if(ng){ cont.style.display='none'; loader.classList.remove('has-continue'); return; }
-      var sid=await getStoredId(); var rec=sid?await getStoredDiscs(sid):null;
-      if(rec){ cont.textContent='▶ Continuer — '+(rec.name||'jeu'); cont.setAttribute('data-id', sid); cont.style.display=''; loader.classList.add('has-continue'); }
-      else { cont.style.display='none'; loader.classList.remove('has-continue'); }
+      var cont=document.getElementById('continue-game'), pick=document.getElementById('pick'), clr=document.getElementById('clearmem');
+      var sid=await getStoredId(); var rec=sid?await getStoredDiscs(sid):null; var hasStored=!!rec;
+      // Un jeu en mémoire → « Continuer » (si aucun ne tourne) + « Vider la mémoire » ; « Charger un disque » disparaît.
+      // Rien en mémoire → seul « Charger un disque ».
+      if(cont){ if(rec && !ng){ cont.textContent='▶ Continuer — '+(rec.name||'jeu'); cont.setAttribute('data-id', sid); cont.style.display=''; } else cont.style.display='none'; }
+      if(pick){ pick.style.display = hasStored ? 'none' : ''; }
+      if(clr){ clr.style.display = hasStored ? '' : 'none'; }
     }
 
     function b64ToU8(id){ var raw=document.getElementById(id).textContent.replace(/\s+/g,''); var bin=atob(raw),n=bin.length,u8=new Uint8Array(n); for(var i=0;i<n;i++)u8[i]=bin.charCodeAt(i); return u8; }
@@ -3884,13 +3887,18 @@ try {
     document.getElementById('continue-game').addEventListener('click', function(){
       var id=this.getAttribute('data-id'); if(id) resumeFromStored(id);
     });
-    // Ouvre le sélecteur de disque — mais si un jeu est gardé en mémoire, prévient qu'il sera retiré.
-    async function pickRom(){
-      if(keepDiscs){ try{ var sid=await getStoredId(); if(sid){ var rec=await getStoredDiscs(sid); var nm=(rec&&rec.name)||'le jeu gardé';
-        if(!confirm('Cela effacera « '+nm+' » actuellement en mémoire. Continuer ?')) return; } }catch(_){ } }
-      document.getElementById('file-rom').click();
-    }
+    // « Charger un disque » n'apparaît que si RIEN n'est en mémoire → ouvre simplement le sélecteur.
+    function pickRom(){ document.getElementById('file-rom').click(); }
     document.getElementById('pick').addEventListener('click', function(){ pickRom(); });
+    // « Vider la mémoire pour lancer un autre jeu » : purge le disque en cache puis recharge la page
+    // → tas WASM remis à zéro (RAM propre), et on retombe sur le seul bouton « Charger un disque ».
+    async function clearMemAndReload(){
+      try{ var sid=await getStoredId(); if(sid){ var rec=await getStoredDiscs(sid); var nm=(rec&&rec.name)||'le jeu en mémoire';
+        if(!confirm('Vider « '+nm+' » de la mémoire et recharger la page pour charger un autre jeu ?')) return; } }catch(_){ }
+      try{ await purgeStoredDiscs(); }catch(_){ }
+      location.reload();
+    }
+    document.getElementById('clearmem').addEventListener('click', function(){ clearMemAndReload(); });
     document.getElementById('pick-bios').addEventListener('click', function(){ document.getElementById('file-bios').click(); });
     document.getElementById('loader-close').addEventListener('click', function(){ if(ng) loader.classList.add('hidden'); });
     document.getElementById('resume-game').addEventListener('click', function(){ if(ng){ loader.classList.add('hidden'); try{ canvas.focus(); }catch(_){ } } });
@@ -3904,7 +3912,7 @@ try {
     bar.addEventListener('click', async function(e){ var b=e.target.closest('button'); if(!b) return; var act=b.getAttribute('data-act');
       try{
         if(act==='menu'){ document.getElementById('loader-close').style.display=ng?'':'none'; document.getElementById('resume-game').style.display=ng?'':'none'; loader.classList.remove('hidden'); updateHomeButtons(); }
-        else if(act==='loadrom'){ await pickRom(); }
+        else if(act==='loadrom'){ await clearMemAndReload(); }
         else if(act==='fs'){ if(document.fullscreenElement){ await document.exitFullscreen(); } else if(stage.requestFullscreen){ await stage.requestFullscreen(); } else if(stage.webkitRequestFullscreen){ stage.webkitRequestFullscreen(); } }
         else if(act==='pad'){ pad.classList.toggle('show'); setTimeout(fit,30); }
         else if(act==='togglelog'){ logEl.classList.toggle('show'); }
