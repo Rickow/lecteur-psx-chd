@@ -61,43 +61,12 @@
   #loader .crest{font-size:.7rem;letter-spacing:.34em;color:var(--dim);text-transform:uppercase}
   #loader .title{font-family:Georgia,serif;font-weight:600;font-size:clamp(1.8rem,6.5vw,3rem);color:var(--ink);text-shadow:0 0 24px rgba(201,162,75,.18)}
   #loader .sub{font-size:.74rem;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;margin-top:-.5rem}
+  #loader #continue-game{font:inherit;font-size:.98rem;font-weight:600;letter-spacing:.03em;padding:.8rem 1.5rem;border-radius:10px;cursor:pointer;color:#0a0a0a;background:var(--glow);border:none;max-width:92%;white-space:normal}
   #loader #pick{font:inherit;font-size:.9rem;letter-spacing:.06em;padding:.75rem 1.4rem;border-radius:10px;cursor:pointer;color:#0a0a0a;background:var(--glow);border:none}
+  /* Quand « Continuer » est visible, « Charger un disque » devient secondaire (contour). */
+  #loader.has-continue #pick{color:#e8e8e8;background:transparent;border:1px solid #3a4150}
   #bios-row{font-size:.64rem;color:var(--dim);display:flex;gap:.5rem;align-items:center;justify-content:center;flex-wrap:wrap}
   #bios-row a{color:var(--glow);cursor:pointer;text-decoration:underline}
-  #keep-row{font-size:.66rem;color:var(--dim);display:flex;gap:.55rem;align-items:center;justify-content:center;cursor:pointer;max-width:40ch;margin:.15rem auto;text-align:left;line-height:1.3}
-  #keep-row input{position:absolute;opacity:0;width:0;height:0}
-  #keep-row .sw{position:relative;width:2.15rem;height:1.2rem;border-radius:999px;background:#3a3f4a;transition:background .18s;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
-  #keep-row .sw::after{content:"";position:absolute;top:2px;left:2px;width:calc(1.2rem - 4px);height:calc(1.2rem - 4px);border-radius:50%;background:#fff;transition:transform .18s;box-shadow:0 1px 2px rgba(0,0,0,.4)}
-  #keep-row input:checked + .sw{background:var(--glow)}
-  #keep-row input:checked + .sw::after{transform:translateX(.95rem)}
-  #keep-row input:focus-visible + .sw{outline:2px solid var(--glow);outline-offset:2px}
-  #keep-row .lbl{flex:1}
-  #history .hs .kept{color:#4c9df0}
-  #status{width:min(400px,88vw);display:flex;flex-direction:column;gap:.45rem;margin-top:.3rem}
-  #status-text{font-size:.7rem;color:var(--ink);letter-spacing:.03em;min-height:1.2em;text-align:center}
-  #progress-wrap{height:10px;background:#1a1a1a;border:1px solid var(--line);border-radius:6px;overflow:hidden}
-  #progress-bar{height:100%;width:0;background:var(--glow);transition:width .12s linear}
-  #progress-bar.pulse{width:100% !important;animation:pulse 1s infinite ease-in-out}
-  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
-  #progress-pct{font-size:.62rem;color:var(--dim);text-align:right;min-height:1em}
-  #loader .hint{font-size:.62rem;color:#666;margin-top:.2rem;line-height:1.7;max-width:min(460px,90vw)}
-  #log{position:fixed;left:0;right:0;bottom:0;z-index:25;max-height:34vh;overflow:auto;display:none;background:rgba(5,5,6,.94);border-top:1px solid var(--line);font-size:.66rem;line-height:1.5;padding:.5rem .7rem;color:#bdb9ad;white-space:pre-wrap}
-  #log.show{display:block} #log .err{color:#e0715f} #log .ok{color:#8fbf6a} #log .muted{color:#6a6a6a}
-  input[type=file]{display:none}
-  @media (orientation: portrait){ #bar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch} #bar::-webkit-scrollbar{display:none} }
-  #history{width:min(92vw,460px);max-height:34vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
-  #history .htitle{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:#8a93a2;margin:.2rem 0 .4rem;text-align:left}
-  #history .hempty{color:#6b7280;font-size:.85rem;text-align:left}
-  #history .hrow{display:flex;align-items:stretch;gap:.4rem;margin-bottom:.35rem}
-  #history .hload{flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:.1rem;background:#1c2027;border:1px solid #2c323d;border-radius:9px;padding:.5rem .7rem;color:#e6e9ef;cursor:pointer;text-align:left}
-  #history .hload:hover{border-color:#4c9df0}
-  #history .hn{font-weight:600;font-size:.92rem;word-break:break-all}
-  #history .hs{font-size:.74rem;color:#8a93a2}
-  #history .hs .rsm{color:#3fb950}
-  #history .hdel{width:38px;background:#1c2027;border:1px solid #2c323d;border-radius:9px;color:#f05d5d;cursor:pointer;font-size:1rem}
-  #history .hdel:hover{border-color:#f05d5d}
-  #freemem{background:transparent;border:1px solid #2c323d;color:#8a93a2;border-radius:9px;padding:.45rem .8rem;font-size:.82rem;cursor:pointer}
-  #freemem:hover{border-color:#4c9df0;color:#e6e9ef}
   #resume-game{background:#3fb950;border:none;color:#06210f;border-radius:10px;padding:.6rem 1.1rem;font-weight:600;font-size:.95rem;cursor:pointer}
   #resume-game:hover{background:#35a544}
   #btn-fps.on{background:#4c9df0;color:#06213d;border-color:#4c9df0}
@@ -134,11 +103,9 @@
       <div class="crest">Émulateur · PlayStation</div>
       <div class="title">Lecteur PSX</div>
       <div class="sub">Charge un disque depuis ton appareil</div>
+      <button id="continue-game" style="display:none">▶ Continuer</button>
       <button id="pick">Charger un disque</button>
       <div id="bios-row">BIOS : <span id="bios-state">HLE (intégré)</span> · <a id="pick-bios">ajouter scph…bin</a></div>
-      <label id="keep-row" title="Garde les fichiers disque dans le navigateur pour reprendre sans les re-sélectionner (un seul jeu à la fois)"><input type="checkbox" id="keep-discs"><span class="sw" aria-hidden="true"></span><span class="lbl">Garder les disques dans le navigateur (reprise directe)</span></label>
-      <div id="history"></div>
-      <button id="freemem" title="Recharge la page pour libérer la mémoire — les sauvegardes sont conservées">Libérer la mémoire</button>
       <div id="status" style="display:none">
         <div id="status-text"></div>
         <div id="progress-wrap"><div id="progress-bar"></div></div>
@@ -3508,7 +3475,7 @@ try {
     var CFG_PATH='/home/web_user/retroarch/userdata/retroarch.cfg';
     var fpsOn=false; try{ fpsOn=(localStorage.getItem('psx_fps')==='1'); }catch(_){ }
     var sticksOn=true; try{ sticksOn=(localStorage.getItem('psx_sticks')!=='0'); }catch(_){ }
-    var keepDiscs=false; try{ keepDiscs=(localStorage.getItem('psx_keepdiscs')==='1'); }catch(_){ }
+    var keepDiscs=true;   // le jeu est TOUJOURS gardé en mémoire (défaut) — plus de toggle : « Continuer » ou « Charger un disque »
     var lastLoadedFiles=null;   // fichiers du dernier jeu chargé (toujours mémorisés → permet de garder le jeu EN COURS quand on active le toggle)
     // Config RetroArch au lancement (binds + compteur FPS de RetroArch si activé)
     var FPS_FONT_SIZE=48;   // taille de l'overlay FPS (l'overlay natif RetroArch est sinon minuscule)
@@ -3584,19 +3551,12 @@ try {
     // Garde les fichiers d'un jeu dans le navigateur si l'option est active (en tâche de fond).
     async function keepGameIfEnabled(id, name, size, files){
       if(!keepDiscs || !files || !files.length) return;
-      try{ var existing=await getStoredDiscs(id); if(existing && existing.size===size){ await histSet(id,{hasDiscs:true}); renderHistory(); return; } }catch(_){ }
+      try{ var existing=await getStoredDiscs(id); if(existing && existing.size===size){ await histSet(id,{hasDiscs:true}); updateHomeButtons(); return; } }catch(_){ }
       log('Enregistrement du jeu dans le navigateur… ('+(size/1048576).toFixed(0)+' Mo)','muted');
       var ok=await storeDiscsFor(id, name, size, files);
       if(ok===true){ await histSet(id,{hasDiscs:true}); log('Jeu gardé en mémoire — reprise directe disponible.','ok'); }
       else { await histSet(id,{hasDiscs:false}); log('Jeu non gardé (espace navigateur insuffisant ?).','muted'); }
-      renderHistory();
-    }
-    // Garde le jeu ACTUELLEMENT lancé (utilisé quand on active le toggle en cours de partie).
-    async function keepCurrentGame(){
-      if(!ng || !romId || !lastLoadedFiles || !lastLoadedFiles.length){ log('Aucun jeu chargé à garder — le prochain jeu chargé sera gardé.','muted'); return; }
-      var size=lastLoadedFiles.reduce(function(a,f){return a+(f.size||0);},0);
-      var meta=(await histGet()).find(function(x){return x.id===romId;});
-      await keepGameIfEnabled(romId, (meta&&meta.name)||curName||'jeu', (meta&&meta.size)||size, lastLoadedFiles);
+      updateHomeButtons();
     }
 
     // ---------- Historique (métadonnées seulement : noms/tailles, PAS les gros CHD → 0 stockage lourd) ----------
@@ -3621,29 +3581,14 @@ try {
       log('Reprise directe depuis les disques gardés : '+rec.name,'ok');
       await handleFiles(files);
     }
-    async function renderHistory(){
-      var box=document.getElementById('history'); if(!box) return;
-      var list=await histGet(); box.innerHTML='';
-      if(!list.length) return;
-      var storedId = keepDiscs ? await getStoredId() : null;
-      var t=document.createElement('div'); t.className='htitle'; t.textContent=storedId?'En mémoire':'Jeux récents'; box.appendChild(t);
-      list.forEach(function(m){
-        var kept = (m.id===storedId);
-        var row=document.createElement('div'); row.className='hrow';
-        var load=document.createElement('button'); load.className='hload';
-        var n=document.createElement('span'); n.className='hn'; n.textContent=m.name;
-        var s=document.createElement('span'); s.className='hs';
-        s.innerHTML=((m.size||0)/1048576).toFixed(1)+' Mo'+(m.hasState?' · <span class="rsm">reprise dispo</span>':'')+(kept?' · <span class="kept">disques gardés</span>':'');
-        load.appendChild(n); load.appendChild(s);
-        load.addEventListener('click', function(){
-          if(kept){ resumeFromStored(m.id); return; }
-          pendingResumeId=m.id;
-          log('Re-sélectionne « '+m.name+' » pour reprendre'+(m.hasState?' (ta sauvegarde se rechargera)':'')+'.','muted');
-          document.getElementById('file-rom').click(); });
-        var del=document.createElement('button'); del.className='hdel'; del.title='Retirer de la liste (la sauvegarde est conservée)'; del.textContent='✕';
-        del.addEventListener('click', function(e){ e.stopPropagation(); histRemove(m.id).then(renderHistory); });
-        row.appendChild(load); row.appendChild(del); box.appendChild(row);
-      });
+    // Met à jour le bouton « Continuer — [titre] » de l'accueil : visible seulement si un jeu est gardé
+    // en mémoire ET qu'aucun jeu ne tourne (sinon on utilise « ◀ Retour au jeu »).
+    async function updateHomeButtons(){
+      var cont=document.getElementById('continue-game'); if(!cont) return;
+      if(ng){ cont.style.display='none'; loader.classList.remove('has-continue'); return; }
+      var sid=await getStoredId(); var rec=sid?await getStoredDiscs(sid):null;
+      if(rec){ cont.textContent='▶ Continuer — '+(rec.name||'jeu'); cont.setAttribute('data-id', sid); cont.style.display=''; loader.classList.add('has-continue'); }
+      else { cont.style.display='none'; loader.classList.remove('has-continue'); }
     }
 
     function b64ToU8(id){ var raw=document.getElementById(id).textContent.replace(/\s+/g,''); var bin=atob(raw),n=bin.length,u8=new Uint8Array(n); for(var i=0;i<n;i++)u8[i]=bin.charCodeAt(i); return u8; }
@@ -3934,12 +3879,11 @@ try {
         await launchDisc(main, main, extra);
       }catch(err){ showLog(); showStatus('Lecture échouée : '+(err&&(err.message||err))); setProgress(0); log('handleFiles: '+(err&&(err.stack||err.message||err)),'err'); }
     }
-    // « Libérer la mémoire » : sauvegarde l'état courant puis recharge la page (RAM remise à zéro ; sauvegardes conservées).
-    document.getElementById('freemem').addEventListener('click', async function(){
-      try{ if(ng){ var r=await robustSaveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); } }catch(_){ }
-      location.reload();
-    });
     document.getElementById('eye').addEventListener('click', function(){ document.body.classList.toggle('chrome-off'); setTimeout(fit,30); });
+    // « ▶ Continuer » : relance directement le jeu gardé en mémoire (+ reprise de la dernière sauvegarde).
+    document.getElementById('continue-game').addEventListener('click', function(){
+      var id=this.getAttribute('data-id'); if(id) resumeFromStored(id);
+    });
     // Ouvre le sélecteur de disque — mais si un jeu est gardé en mémoire, prévient qu'il sera retiré.
     async function pickRom(){
       if(keepDiscs){ try{ var sid=await getStoredId(); if(sid){ var rec=await getStoredDiscs(sid); var nm=(rec&&rec.name)||'le jeu gardé';
@@ -3959,7 +3903,7 @@ try {
 
     bar.addEventListener('click', async function(e){ var b=e.target.closest('button'); if(!b) return; var act=b.getAttribute('data-act');
       try{
-        if(act==='menu'){ document.getElementById('loader-close').style.display=ng?'':'none'; document.getElementById('resume-game').style.display=ng?'':'none'; loader.classList.remove('hidden'); renderHistory(); }
+        if(act==='menu'){ document.getElementById('loader-close').style.display=ng?'':'none'; document.getElementById('resume-game').style.display=ng?'':'none'; loader.classList.remove('hidden'); updateHomeButtons(); }
         else if(act==='loadrom'){ await pickRom(); }
         else if(act==='fs'){ if(document.fullscreenElement){ await document.exitFullscreen(); } else if(stage.requestFullscreen){ await stage.requestFullscreen(); } else if(stage.webkitRequestFullscreen){ stage.webkitRequestFullscreen(); } }
         else if(act==='pad'){ pad.classList.toggle('show'); setTimeout(fit,30); }
@@ -3983,17 +3927,10 @@ try {
       if(iso){ try{sessionStorage.removeItem('coiReloaded');}catch(_){ } log('Isolation crossOrigin : OK (streaming threadé dispo).','ok'); }
       else { log('Isolation crossOrigin : NON'+(sab?' (SAB présent)':'')+' — le core threadé nécessite COOP/COEP via le service worker.','warn');
         if(location.protocol==='file:') log('Le streaming exige un contexte servi (http/https) + service worker : file:// ne peut pas isoler.','muted'); }
-      var _kc=document.getElementById('keep-discs');
-      if(_kc){ _kc.checked=keepDiscs;
-        _kc.addEventListener('change', async function(){ keepDiscs=_kc.checked; try{ localStorage.setItem('psx_keepdiscs', keepDiscs?'1':'0'); }catch(_){ }
-          if(keepDiscs){ log('Option activée : les jeux sont gardés pour la reprise directe.','ok'); await keepCurrentGame(); }
-          else { await purgeStoredDiscs(); log('Jeux retirés de la mémoire du navigateur.','muted'); }
-          renderHistory(); }); }
       // Détection d'un crash lors d'un changement de disque (la page s'est rechargée pendant le swap).
       try{ var _sc=localStorage.getItem('psx_swapcrash'); if(_sc){ localStorage.removeItem('psx_swapcrash'); var _o=JSON.parse(_sc);
         showLog(); log('⚠ Le dernier changement de disque (CD '+_o.from+'→'+_o.to+' de « '+_o.name+' ») a fait recharger la page — probablement mémoire insuffisante (fréquent sur iPhone lors du swap d\'un gros CD).','err'); } }catch(_){ }
-      // Nettoyage au lancement : sans l'option, on ne garde aucun disque (housekeeping).
-      if(keepDiscs){ renderHistory(); } else { purgeStoredDiscs().then(renderHistory); }
+      updateHomeButtons();   // affiche « ▶ Continuer — [titre] » si un jeu est gardé en mémoire
       if(fpsOn){ var _fb=document.getElementById('btn-fps'); if(_fb) _fb.classList.add('on'); } })();
     // Service worker : cache offline + COOP/COEP. Recharge une fois pour gagner l'isolation au 1er lancement.
     if('serviceWorker' in navigator && location.protocol.startsWith('http')){
