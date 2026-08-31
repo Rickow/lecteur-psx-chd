@@ -3746,6 +3746,8 @@ try {
         step='lecture du fichier';
         try{ await d.file.slice(0,16).arrayBuffer(); }
         catch(rerr){ log('Le fichier du CD '+(target+1)+' n\'est plus lisible (re-sélectionner les disques). ['+(rerr&&(rerr.name||rerr.message||rerr))+']','err'); busy=false; return; }
+        // Sentinelle : si la page se recharge (crash dur / mémoire iPhone) pendant le swap, on le détecte au prochain démarrage.
+        try{ localStorage.setItem('psx_swapcrash', JSON.stringify({name:curName, from:curDiscIndex+1, to:target+1, n:discs.length})); }catch(_){ }
         step='éjection (DISK_EJECT_TOGGLE)';
         ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(350);        // 1) éjecte → le core ferme le fichier courant
         step='libération de l\'ancien CD';
@@ -3758,9 +3760,10 @@ try {
         step='insertion (DISK_EJECT_TOGGLE)';
         ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(350);        // 5) insère → le core ouvre le nouveau fichier
         curDiscIndex=target;
+        try{ localStorage.removeItem('psx_swapcrash'); }catch(_){ }   // succès → sentinelle levée
         updateDiscUI(); log('CD '+(target+1)+'/'+discs.length+' inséré.','ok');
         try{ canvas.focus(); }catch(_){ }
-      }catch(e){ showLog(); log('Changement de disque — échec à l\'étape « '+step+' » : '+(e&&(e.message||e||e)),'err'); }
+      }catch(e){ try{ localStorage.removeItem('psx_swapcrash'); }catch(_){ } showLog(); log('Changement de disque — échec à l\'étape « '+step+' » : '+(e&&(e.message||e||e)),'err'); }
       finally{ busy=false; }
     }
     async function launchMulti(discList){
@@ -3951,6 +3954,9 @@ try {
           if(keepDiscs){ log('Option activée : le prochain jeu chargé sera gardé pour la reprise directe.','ok'); }
           else { await purgeStoredDiscs(); log('Disques retirés du navigateur.','muted'); }
           renderHistory(); }); }
+      // Détection d'un crash lors d'un changement de disque (la page s'est rechargée pendant le swap).
+      try{ var _sc=localStorage.getItem('psx_swapcrash'); if(_sc){ localStorage.removeItem('psx_swapcrash'); var _o=JSON.parse(_sc);
+        showLog(); log('⚠ Le dernier changement de disque (CD '+_o.from+'→'+_o.to+' de « '+_o.name+' ») a fait recharger la page — probablement mémoire insuffisante (fréquent sur iPhone lors du swap d\'un gros CD).','err'); } }catch(_){ }
       // Nettoyage au lancement : sans l'option, on ne garde aucun disque (housekeeping).
       if(keepDiscs){ renderHistory(); } else { purgeStoredDiscs().then(renderHistory); }
       if(fpsOn){ var _fb=document.getElementById('btn-fps'); if(_fb) _fb.classList.add('on'); } })();
