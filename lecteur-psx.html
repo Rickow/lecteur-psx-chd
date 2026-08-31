@@ -48,10 +48,13 @@
   #pad .sh button{border-radius:12px;padding:.4rem .95rem;font-size:.66rem;letter-spacing:.1em}
   #pad .se{display:flex;gap:.7rem;justify-content:center;margin-top:.5rem}
   #pad .se button{border-radius:999px;padding:.45rem .9rem;font-size:.58rem;letter-spacing:.14em;text-transform:uppercase}
+  #pad .ds{display:flex;justify-content:center;margin-top:.4rem}
+  #pad .ds button{border-radius:999px;padding:.28rem .85rem;font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;opacity:.6;background:rgba(18,18,18,.42);border:1px solid rgba(255,255,255,.14);color:#e8e8e8}
+  #pad .ds button.on{opacity:1;background:rgba(201,162,75,.22);border-color:rgba(201,162,75,.55);color:#f2d9a0}
   #pad .stick{position:absolute;bottom:calc(var(--k)*1.1 + env(safe-area-inset-bottom));width:calc(var(--k)*2.1);height:calc(var(--k)*2.1);border-radius:50%;background:rgba(18,18,18,.38);border:1px solid rgba(255,255,255,.12);pointer-events:auto;touch-action:none;display:none}
   #pad .stick .knob{position:absolute;left:50%;top:50%;width:46%;height:46%;border-radius:50%;background:rgba(201,162,75,.55);transform:translate(-50%,-50%);pointer-events:none}
   #pad .stick.left{left:calc(var(--k)*3.5)} #pad .stick.right{right:calc(var(--k)*3.5)}
-  @media (orientation:landscape){ #pad .stick{display:block} }
+  @media (orientation:landscape){ #pad:not(.no-sticks) .stick{display:block} }
   #loader{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1rem;background:radial-gradient(120% 90% at 50% 30%,#101014 0%,#050506 72%);text-align:center;padding:1.2rem}
   #loader.hidden{display:none}
   #loader-close{position:absolute;top:max(.7rem,env(safe-area-inset-top));right:1rem;width:34px;height:34px;border-radius:50%;background:#141414;border:1px solid var(--line);color:var(--ink);cursor:pointer;font-size:.9rem;display:none}
@@ -3492,15 +3495,18 @@ try {
     var CONTENT_DIR='/home/web_user/retroarch/userdata/content';
     var CFG_PATH='/home/web_user/retroarch/userdata/retroarch.cfg';
     var fpsOn=false; try{ fpsOn=(localStorage.getItem('psx_fps')==='1'); }catch(_){ }
+    var sticksOn=true; try{ sticksOn=(localStorage.getItem('psx_sticks')!=='0'); }catch(_){ }
     // Config RetroArch au lancement (binds + compteur FPS de RetroArch si activé)
-    function raCfg(){ var c=Object.assign({},BINDS); if(fpsOn) c.fps_show=true; return c; }
+    function raCfg(){ var c=Object.assign({},BINDS); if(fpsOn){ c.fps_show=true; c.video_font_enable=true; } return c; }
     // Active/désactive le compteur FPS EN DIRECT : réécrit fps_show dans la config + recharge la config.
     function applyFpsLive(){
       if(!ng) return false;
       try{
         var FS=ng.getEmscriptenFS(); var cfg=FS.readFile(CFG_PATH,{encoding:'utf8'});
-        var line='fps_show = "'+(fpsOn?'true':'false')+'"';
-        cfg = /^fps_show\s*=.*$/m.test(cfg) ? cfg.replace(/^fps_show\s*=.*$/m, line) : (cfg.replace(/\n*$/,'\n')+line+'\n');
+        function setKey(txt,key,val){ var line=key+' = "'+val+'"'; var re=new RegExp('^'+key+'\\s*=.*$','m');
+          return re.test(txt) ? txt.replace(re,line) : (txt.replace(/\n*$/,'\n')+line+'\n'); }
+        cfg=setKey(cfg,'fps_show', fpsOn?'true':'false');
+        if(fpsOn) cfg=setKey(cfg,'video_font_enable','true');
         FS.writeFile(CFG_PATH, cfg);
         var M=ng.getEmscriptenModule();
         if(M && typeof M._cmd_reload_config==='function'){ M._cmd_reload_config(); return true; }
@@ -3607,6 +3613,7 @@ try {
         +'<div class="row"><div class="dpad" id="dpad"><span class="hub"></span><span class="ar u">▲</span><span class="ar d">▼</span><span class="ar l">◀</span><span class="ar r">▶</span></div>'
         +'<div class="face"><button class="tri" data-btn="x">△</button><button class="sq" data-btn="y">□</button><button class="ci" data-btn="a">○</button><button class="cr" data-btn="b">✕</button></div></div>'
         +'<div class="se"><button data-btn="select">Select</button><button data-btn="start">Start</button></div>'
+        +'<div class="ds"><button id="ds-toggle" type="button">DualShock</button></div>'
         +'<div class="stick left" id="stickL"><span class="knob"></span></div><div class="stick right" id="stickR"><span class="knob"></span></div>';
       dpadEl=document.getElementById('dpad'); dpadPointer=null; dpadDirs={up:false,down:false,left:false,right:false};
       dpadEl.addEventListener('pointerdown',function(e){ e.preventDefault(); if(dpadPointer!==null) return; dpadPointer=e.pointerId; try{dpadEl.setPointerCapture(e.pointerId);}catch(_){ } updateDpad(e); });
@@ -3619,6 +3626,15 @@ try {
         el.addEventListener('pointerup',rel); el.addEventListener('pointercancel',rel); el.addEventListener('lostpointercapture',rel);
       });
       stickCtl.l=makeStick(document.getElementById('stickL'),'l'); stickCtl.r=makeStick(document.getElementById('stickR'),'r');
+      // Bascule DualShock : affiche/masque les sticks analogiques (ils prennent de la place en paysage).
+      var dsBtn=document.getElementById('ds-toggle');
+      if(dsBtn){
+        var applyDs=function(){ var on=sticksOn; pad.classList.toggle('no-sticks',!on); dsBtn.classList.toggle('on',on);
+          dsBtn.textContent='DualShock '+(on?'●':'○'); if(!on){ if(stickCtl.l)stickCtl.l.reset(); if(stickCtl.r)stickCtl.r.reset(); } };
+        dsBtn.addEventListener('click',function(e){ e.preventDefault(); sticksOn=!sticksOn;
+          try{ localStorage.setItem('psx_sticks', sticksOn?'1':'0'); }catch(_){ } applyDs(); });
+        applyDs();
+      }
       var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window); if(coarse) pad.classList.add('show');
     }
     function releaseAll(){ Object.keys(held).forEach(function(n){ var el=held[n]; if(el&&el.classList)el.classList.remove('on'); try{ if(ng)ng.pressUp(n); }catch(_){ } }); held={}; clearDpad(); if(stickCtl.l)stickCtl.l.reset(); if(stickCtl.r)stickCtl.r.reset(); }
@@ -3669,20 +3685,35 @@ try {
     // éjecte (le core ferme le fichier) → libère l'ANCIEN → écrit le NOUVEAU → aligne l'index → insère.
     async function swapDisc(target){
       if(!isMulti || busy || !ng || target===curDiscIndex || target<0 || target>=discs.length) return;
-      busy=true;
+      busy=true; showLog();
+      var step='init';
       try{
+        var M=ng.getEmscriptenModule();
+        if(!M || typeof M.EmscriptenSendCommand!=='function'){
+          log('Changement de disque impossible : ce core n\'expose pas l\'interface de commandes (EmscriptenSendCommand) — le CD ne peut pas être changé à chaud.','err');
+          busy=false; return;
+        }
         var FS=ng.getEmscriptenFS(); var old=discs[curDiscIndex], d=discs[target];
-        log('Changement de disque → '+(target+1)+'/'+discs.length+'…','muted');
-        ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(300);        // 1) éjecte → le core ferme le fichier courant
+        log('Changement de disque → CD '+(target+1)+'/'+discs.length+'…','muted');
+        // Vérifie que le nouveau CD est encore lisible (Safari libère parfois les File au bout d'un moment).
+        step='lecture du fichier';
+        try{ await d.file.slice(0,16).arrayBuffer(); }
+        catch(rerr){ log('Le fichier du CD '+(target+1)+' n\'est plus lisible (re-sélectionner les disques). ['+(rerr&&(rerr.name||rerr.message||rerr))+']','err'); busy=false; return; }
+        step='éjection (DISK_EJECT_TOGGLE)';
+        ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(350);        // 1) éjecte → le core ferme le fichier courant
+        step='libération de l\'ancien CD';
         unlinkDisc(FS, old.fsName);                                  // 2) libère l'ANCIEN d'abord (jamais 2 disques en RAM)
+        step='écriture du nouveau CD';
         await writeDiscToFS(FS, d.fsName, d.file, d.sbi);            // 3) écrit le NOUVEAU (par morceaux de 8 Mo)
+        step='changement d\'index (DISK_NEXT/PREV)';
         var delta=target-curDiscIndex, cmd=delta>0?'DISK_NEXT':'DISK_PREV';
-        for(var i=0;i<Math.abs(delta);i++){ ng.sendCommand(cmd); await wait(150); }  // 4) aligne l'index
-        ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(300);        // 5) insère → le core ouvre le nouveau fichier
+        for(var i=0;i<Math.abs(delta);i++){ ng.sendCommand(cmd); await wait(200); }  // 4) aligne l'index
+        step='insertion (DISK_EJECT_TOGGLE)';
+        ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(350);        // 5) insère → le core ouvre le nouveau fichier
         curDiscIndex=target;
-        updateDiscUI(); log('Disque '+(target+1)+'/'+discs.length+' inséré.','ok');
+        updateDiscUI(); log('CD '+(target+1)+'/'+discs.length+' inséré.','ok');
         try{ canvas.focus(); }catch(_){ }
-      }catch(e){ showLog(); log('Changement de disque : '+(e&&(e.message||e)),'err'); }
+      }catch(e){ showLog(); log('Changement de disque — échec à l\'étape « '+step+' » : '+(e&&(e.message||e||e)),'err'); }
       finally{ busy=false; }
     }
     async function launchMulti(discList){
