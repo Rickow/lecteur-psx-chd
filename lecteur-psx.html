@@ -3639,20 +3639,21 @@ try {
       if(sbiU8){ try{ FS.writeFile(CONTENT_DIR+'/'+sbiName(fsName), sbiU8); }catch(_){ } }
     }
     function unlinkDisc(FS, fsName){ try{ FS.unlink(CONTENT_DIR+'/'+fsName); }catch(_){ } try{ FS.unlink(CONTENT_DIR+'/'+sbiName(fsName)); }catch(_){ } }
-    // Change de disque : écrit le cible, éjecte → aligne l'index → insère, puis libère l'ancien.
+    // Change de disque en gardant TOUJOURS ≤ 1 disque en RAM :
+    // éjecte (le core ferme le fichier) → libère l'ANCIEN → écrit le NOUVEAU → aligne l'index → insère.
     async function swapDisc(target){
       if(!isMulti || busy || !ng || target===curDiscIndex || target<0 || target>=discs.length) return;
       busy=true;
       try{
-        var FS=ng.getEmscriptenFS(); var d=discs[target];
+        var FS=ng.getEmscriptenFS(); var old=discs[curDiscIndex], d=discs[target];
         log('Changement de disque → '+(target+1)+'/'+discs.length+'…','muted');
-        await writeDiscToFS(FS, d.fsName, d.file, d.sbi);            // 1) écrit le disque cible
-        ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(250);        // 2) ouvre le plateau
+        ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(300);        // 1) éjecte → le core ferme le fichier courant
+        unlinkDisc(FS, old.fsName);                                  // 2) libère l'ANCIEN d'abord (jamais 2 disques en RAM)
+        await writeDiscToFS(FS, d.fsName, d.file, d.sbi);            // 3) écrit le NOUVEAU (par morceaux de 8 Mo)
         var delta=target-curDiscIndex, cmd=delta>0?'DISK_NEXT':'DISK_PREV';
-        for(var i=0;i<Math.abs(delta);i++){ ng.sendCommand(cmd); await wait(150); }  // 3) aligne l'index
-        ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(250);        // 4) insère → le core ouvre le nouveau fichier
-        var old=discs[curDiscIndex]; curDiscIndex=target;
-        unlinkDisc(FS, old.fsName);                                  // 5) libère l'ancien (jamais 2 disques en RAM)
+        for(var i=0;i<Math.abs(delta);i++){ ng.sendCommand(cmd); await wait(150); }  // 4) aligne l'index
+        ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(300);        // 5) insère → le core ouvre le nouveau fichier
+        curDiscIndex=target;
         updateDiscUI(); log('Disque '+(target+1)+'/'+discs.length+' inséré.','ok');
         try{ canvas.focus(); }catch(_){ }
       }catch(e){ showLog(); log('Changement de disque : '+(e&&(e.message||e)),'err'); }
