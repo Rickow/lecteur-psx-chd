@@ -48,13 +48,13 @@
   #pad .sh button{border-radius:12px;padding:.4rem .95rem;font-size:.66rem;letter-spacing:.1em}
   #pad .se{display:flex;gap:.7rem;justify-content:center;margin-top:.5rem}
   #pad .se button{border-radius:999px;padding:.45rem .9rem;font-size:.58rem;letter-spacing:.14em;text-transform:uppercase}
-  #pad .ds{display:flex;justify-content:center;margin-top:.4rem}
+  #pad .ds{display:none;justify-content:center;margin-top:.4rem}
   #pad .ds button{border-radius:999px;padding:.28rem .85rem;font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;opacity:.6;background:rgba(18,18,18,.42);border:1px solid rgba(255,255,255,.14);color:#e8e8e8}
   #pad .ds button.on{opacity:1;background:rgba(201,162,75,.22);border-color:rgba(201,162,75,.55);color:#f2d9a0}
   #pad .stick{position:absolute;bottom:calc(var(--k)*1.1 + env(safe-area-inset-bottom));width:calc(var(--k)*2.1);height:calc(var(--k)*2.1);border-radius:50%;background:rgba(18,18,18,.38);border:1px solid rgba(255,255,255,.12);pointer-events:auto;touch-action:none;display:none}
   #pad .stick .knob{position:absolute;left:50%;top:50%;width:46%;height:46%;border-radius:50%;background:rgba(201,162,75,.55);transform:translate(-50%,-50%);pointer-events:none}
   #pad .stick.left{left:calc(var(--k)*3.5)} #pad .stick.right{right:calc(var(--k)*3.5)}
-  @media (orientation:landscape){ #pad:not(.no-sticks) .stick{display:block} }
+  @media (orientation:landscape){ #pad:not(.no-sticks) .stick{display:block} #pad .ds{display:flex} }
   #loader{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1rem;background:radial-gradient(120% 90% at 50% 30%,#101014 0%,#050506 72%);text-align:center;padding:1.2rem}
   #loader.hidden{display:none}
   #loader-close{position:absolute;top:max(.7rem,env(safe-area-inset-top));right:1rem;width:34px;height:34px;border-radius:50%;background:#141414;border:1px solid var(--line);color:var(--ink);cursor:pointer;font-size:.9rem;display:none}
@@ -64,8 +64,14 @@
   #loader #pick{font:inherit;font-size:.9rem;letter-spacing:.06em;padding:.75rem 1.4rem;border-radius:10px;cursor:pointer;color:#0a0a0a;background:var(--glow);border:none}
   #bios-row{font-size:.64rem;color:var(--dim);display:flex;gap:.5rem;align-items:center;justify-content:center;flex-wrap:wrap}
   #bios-row a{color:var(--glow);cursor:pointer;text-decoration:underline}
-  #keep-row{font-size:.66rem;color:var(--dim);display:flex;gap:.5rem;align-items:center;justify-content:center;cursor:pointer;flex-wrap:wrap;max-width:38ch;margin:.1rem auto .1rem;text-align:center;line-height:1.3}
-  #keep-row input{accent-color:var(--glow);width:1rem;height:1rem;flex:none}
+  #keep-row{font-size:.66rem;color:var(--dim);display:flex;gap:.55rem;align-items:center;justify-content:center;cursor:pointer;max-width:40ch;margin:.15rem auto;text-align:left;line-height:1.3}
+  #keep-row input{position:absolute;opacity:0;width:0;height:0}
+  #keep-row .sw{position:relative;width:2.15rem;height:1.2rem;border-radius:999px;background:#3a3f4a;transition:background .18s;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+  #keep-row .sw::after{content:"";position:absolute;top:2px;left:2px;width:calc(1.2rem - 4px);height:calc(1.2rem - 4px);border-radius:50%;background:#fff;transition:transform .18s;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+  #keep-row input:checked + .sw{background:var(--glow)}
+  #keep-row input:checked + .sw::after{transform:translateX(.95rem)}
+  #keep-row input:focus-visible + .sw{outline:2px solid var(--glow);outline-offset:2px}
+  #keep-row .lbl{flex:1}
   #history .hs .kept{color:#4c9df0}
   #status{width:min(400px,88vw);display:flex;flex-direction:column;gap:.45rem;margin-top:.3rem}
   #status-text{font-size:.7rem;color:var(--ink);letter-spacing:.03em;min-height:1.2em;text-align:center}
@@ -130,7 +136,7 @@
       <div class="sub">Charge un disque depuis ton appareil</div>
       <button id="pick">Charger un disque</button>
       <div id="bios-row">BIOS : <span id="bios-state">HLE (intégré)</span> · <a id="pick-bios">ajouter scph…bin</a></div>
-      <label id="keep-row" title="Garde les fichiers disque dans le navigateur pour reprendre sans les re-sélectionner (un seul jeu à la fois)"><input type="checkbox" id="keep-discs"> Garder les disques dans le navigateur (reprise directe)</label>
+      <label id="keep-row" title="Garde les fichiers disque dans le navigateur pour reprendre sans les re-sélectionner (un seul jeu à la fois)"><input type="checkbox" id="keep-discs"><span class="sw" aria-hidden="true"></span><span class="lbl">Garder les disques dans le navigateur (reprise directe)</span></label>
       <div id="history"></div>
       <button id="freemem" title="Recharge la page pour libérer la mémoire — les sauvegardes sont conservées">Libérer la mémoire</button>
       <div id="status" style="display:none">
@@ -2463,6 +2469,8 @@ try {
 			// crasher l'onglet iPhone sur les gros jeux (FF7/8). Pic RAM ≈ 1× le disque + 1 morceau.
 			if (blob && typeof blob.slice === "function" && blob.size > 16 * 1024 * 1024) {
 				const stream = FS.open(filePath, "w");
+				// Pré-alloue la taille finale → MEMFS n'agrandit plus par doublement (pic ~2× → OOM iPhone).
+				try { FS.truncate(filePath, blob.size); } catch {}
 				const CHUNK = 8 * 1024 * 1024;
 				for (let off = 0; off < blob.size; off += CHUNK) {
 					const chunk = new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer());
@@ -3503,7 +3511,8 @@ try {
     var keepDiscs=false; try{ keepDiscs=(localStorage.getItem('psx_keepdiscs')==='1'); }catch(_){ }
     var pendingStoreFiles=null;   // fichiers de la sélection en cours, à stocker après lancement si keepDiscs
     // Config RetroArch au lancement (binds + compteur FPS de RetroArch si activé)
-    function raCfg(){ var c=Object.assign({},BINDS); if(fpsOn){ c.fps_show=true; c.video_font_enable=true; } return c; }
+    var FPS_FONT_SIZE=48;   // taille de l'overlay FPS (l'overlay natif RetroArch est sinon minuscule)
+    function raCfg(){ var c=Object.assign({},BINDS); if(fpsOn){ c.fps_show=true; c.video_font_enable=true; c.video_font_size=FPS_FONT_SIZE; } return c; }
     // Active/désactive le compteur FPS EN DIRECT : réécrit fps_show dans la config + recharge la config.
     function applyFpsLive(){
       if(!ng) return false;
@@ -3512,7 +3521,7 @@ try {
         function setKey(txt,key,val){ var line=key+' = "'+val+'"'; var re=new RegExp('^'+key+'\\s*=.*$','m');
           return re.test(txt) ? txt.replace(re,line) : (txt.replace(/\n*$/,'\n')+line+'\n'); }
         cfg=setKey(cfg,'fps_show', fpsOn?'true':'false');
-        if(fpsOn) cfg=setKey(cfg,'video_font_enable','true');
+        if(fpsOn){ cfg=setKey(cfg,'video_font_enable','true'); cfg=setKey(cfg,'video_font_size', String(FPS_FONT_SIZE)); }
         FS.writeFile(CFG_PATH, cfg);
         var M=ng.getEmscriptenModule();
         if(M && typeof M._cmd_reload_config==='function'){ M._cmd_reload_config(); return true; }
@@ -3709,6 +3718,13 @@ try {
     }
     // ---------- Multi-disque (m3u paresseux : N disques listés, UN SEUL en RAM à la fois) ----------
     function wait(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+    // Chargement d'état ROBUSTE : ng.loadState écrit le fichier PUIS envoie LOAD_STATE aussitôt ;
+    // au 1er coup le fichier n'est pas toujours « flush » côté core → il charge l'ancien état.
+    // On ré-émet LOAD_STATE après un court délai (le fichier est alors bien en place) → fiable au 1er essai.
+    async function robustLoadState(data){
+      if(!ng) return; await ng.loadState(data); await wait(250);
+      try{ ng.sendCommand('LOAD_STATE'); }catch(_){ }
+    }
     function discNum(name){ var m=/[\(\[]?\s*(?:disc|disk|cd)\s*[:#\-]?\s*(\d+)/i.exec(name); return m?parseInt(m[1],10):null; }
     function sbiName(fsName){ return fsName.replace(/\.[^.]+$/,'.sbi'); }
     function updateDiscUI(){
@@ -3719,10 +3735,14 @@ try {
     }
     // Écrit un disque (gros) en MEMFS PAR MORCEAUX (pas de pic RAM) + son .sbi éventuel.
     async function writeDiscToFS(FS, fsName, file, sbiU8){
-      var stream=FS.open(CONTENT_DIR+'/'+fsName,'w'), CHUNK=8*1024*1024;
+      var path=CONTENT_DIR+'/'+fsName, stream=FS.open(path,'w'), CHUNK=8*1024*1024;
+      // Pré-alloue la taille finale en UNE fois → MEMFS n'agrandit plus par doublement de capacité
+      // (sinon pic ~2× la taille du disque en cours d'écriture → OOM iPhone). Puis on n'écrit que dans cette zone.
+      try{ FS.truncate(path, file.size); }catch(_){ }
       for(var off=0; off<file.size; off+=CHUNK){
         var chunk=new Uint8Array(await file.slice(off,off+CHUNK).arrayBuffer());
         FS.write(stream, chunk, 0, chunk.length, off);
+        chunk=null;   // libère la tranche au plus vite
       }
       FS.close(stream);
       if(sbiU8){ try{ FS.writeFile(CONTENT_DIR+'/'+sbiName(fsName), sbiU8); }catch(_){ } }
@@ -3803,7 +3823,7 @@ try {
           var _man=await idbGet('state:'+romId), _aut=await idbGet('autostate:'+romId);
           await histAdd({id:romId,name:curName+' ('+discs.length+' CD)',size:totalSize,ext:'m3u',date:Date.now(),hasState:!!(_man||_aut),stateTs:_prev.stateTs||0,autoTs:_prev.autoTs||0,hasDiscs:_prev.hasDiscs||false});
           maybeStoreDiscs(romId, curName+' ('+discs.length+' CD)', totalSize);
-          if(pendingResumeId===romId){ var _useAuto=_aut&&(!_man||(_prev.autoTs||0)>(_prev.stateTs||0)); var _st=_useAuto?_aut:(_man||_aut); if(_st){ await ng.loadState(_st); log('Reprise : sauvegarde '+(_useAuto?'auto':'manuelle')+' rechargée.','ok'); } }
+          if(pendingResumeId===romId){ var _useAuto=_aut&&(!_man||(_prev.autoTs||0)>(_prev.stateTs||0)); var _st=_useAuto?_aut:(_man||_aut); if(_st){ await robustLoadState(_st); log('Reprise : sauvegarde '+(_useAuto?'auto':'manuelle')+' rechargée.','ok'); } }
         }catch(_){ }
         pendingResumeId=null; startAutoSave();
       }catch(e){ showLog(); showStatus('Échec : '+(e&&(e.message||e))); setProgress(0); log('Échec multi-disque : '+(e&&(e.message||e)),'err'); }
@@ -3851,7 +3871,7 @@ try {
           if(pendingResumeId===romId){
             var _useAuto=_aut&&(!_man||(_prev.autoTs||0)>(_prev.stateTs||0));
             var _st=_useAuto?_aut:(_man||_aut);
-            if(_st){ await ng.loadState(_st); log('Reprise : sauvegarde '+(_useAuto?'auto':'manuelle')+' rechargée.','ok'); }
+            if(_st){ await robustLoadState(_st); log('Reprise : sauvegarde '+(_useAuto?'auto':'manuelle')+' rechargée.','ok'); }
           }
         }catch(_){ }
         pendingResumeId=null;
@@ -3933,14 +3953,14 @@ try {
         else if(act==='fps-toggle'){ toggleFps(); }
         else if(!ng){ log('Charge d\u2019abord un disque.','muted'); }
         else if(act==='savestate'){ var r=await ng.saveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); log('État sauvegardé dans la page.','ok'); }
-        else if(act==='loadstate'){ var st=await idbGet('state:'+romId); if(!st){ log('Aucun état en page pour ce jeu.'); } else { await ng.loadState(st); log('État rechargé.','ok'); } }
+        else if(act==='loadstate'){ var st=await idbGet('state:'+romId); if(!st){ log('Aucun état en page pour ce jeu.'); } else { await robustLoadState(st); log('État rechargé.','ok'); } }
         else if(act==='exportstate'){ var re=await ng.saveState(); download(re&&re.state?re.state:re, curName+'.state'); log('État exporté → '+curName+'.state','ok'); }
         else if(act==='importstate'){ document.getElementById('file-state').click(); }
         else if(act==='exportsram'){ var blob=await ng.saveSRAM(); download(blob, curName+'.srm'); log('Carte mémoire exportée → '+curName+'.srm','ok'); }
         else if(act==='importsram'){ document.getElementById('file-sram').click(); }
       }catch(err){ showLog(); log('Action « '+act+' » : '+(err&&(err.message||err)),'err'); }
     });
-    document.getElementById('file-state').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng) return; try{ await ng.loadState(new Uint8Array(await f.arrayBuffer())); log('État chargé : '+f.name,'ok'); }catch(err){ showLog(); log('Chargement état : '+(err&&(err.message||err)),'err'); } });
+    document.getElementById('file-state').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng) return; try{ await robustLoadState(new Uint8Array(await f.arrayBuffer())); log('État importé : '+f.name,'ok'); }catch(err){ showLog(); log('Chargement état : '+(err&&(err.message||err)),'err'); } });
     document.getElementById('file-sram').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng||!curFile) return; try{ if(ng&&ng.exit) await ng.exit(); }catch(_){ } try{ var sram=new Uint8Array(await f.arrayBuffer()); freshCanvas(); var blobs=coreBlobs(); var opts={ element:canvas, core:'pcsx_rearmed', resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;}, rom:{fileName:'game.'+curExt,fileContent:new Uint8Array(await curFile.arrayBuffer())}, sram:sram, retroarchConfig:raCfg(), retroarchCoreConfig:{pcsx_rearmed_bios:(biosBlob?'auto':'HLE'),pcsx_rearmed_pad1type:'dualshock'} }; if(biosBlob) opts.bios={fileName:biosName,fileContent:biosBlob}; ng=await Nostalgist.launch(opts); fit(); log('Carte mémoire importée et jeu relancé.','ok'); }catch(err){ showLog(); log('Import carte mémoire : '+(err&&(err.message||err)),'err'); } });
 
     (function init(){ log(location.protocol==='file:'?'Contexte : file:// (double-clic).':'Contexte : '+location.protocol+' (servi).');
