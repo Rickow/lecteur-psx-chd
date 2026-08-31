@@ -88,6 +88,7 @@
   #freemem:hover{border-color:#4c9df0;color:#e6e9ef}
   #resume-game{background:#3fb950;border:none;color:#06210f;border-radius:10px;padding:.6rem 1.1rem;font-weight:600;font-size:.95rem;cursor:pointer}
   #resume-game:hover{background:#35a544}
+  #btn-fps.on{background:#4c9df0;color:#06213d;border-color:#4c9df0}
 </style>
 </head>
 <body>
@@ -104,6 +105,7 @@
       <button data-act="disc" id="btn-disc" style="display:none">Disque 1/1</button>
       <button data-act="fs">Plein écran</button>
       <button data-act="pad">Manette</button>
+      <button data-act="fps-toggle" id="btn-fps">FPS</button>
       <button data-act="savestate">Sauver état</button>
       <button data-act="loadstate">Charger état</button>
       <button data-act="exportstate">Exporter état</button>
@@ -129,7 +131,8 @@
         <div id="progress-wrap"><div id="progress-bar"></div></div>
         <div id="progress-pct"></div>
       </div>
-      <div class="hint">Formats : <b>.chd</b> (recommandé), .pbp, .cue+.bin, .iso, .img, .m3u. Le <b>.chd</b> est compressé → bien plus léger en mémoire sur iPhone. Rien n'est envoyé : tout reste local.</div>
+      <div class="hint">Formats : <b>.chd</b> (recommandé), .pbp, .cue+.bin, .iso, .img, .m3u. Le <b>.chd</b> est compressé → bien plus léger en mémoire sur iPhone. Rien n'est envoyé : tout reste local.<br>
+        <b>Jeu multi-CD</b> (FF7/8/9…) : sélectionne <b>tous les CD d'un coup</b> (+ leurs .sbi si version PAL) → un bouton « Disque » apparaît pour changer de CD. Un seul disque en mémoire à la fois. <b>Charge-les dès le départ</b> : les sauvegardes ne se transfèrent pas automatiquement entre « 1 CD seul » et « multi » (sinon passe par Exporter/Importer l'état).</div>
     </div>
   </div>
 
@@ -3487,6 +3490,29 @@ try {
     var ng=null, curName='disc', curExt='chd', curFile=null, romId='disc', held={}, busy=false;
     var discs=[], curDiscIndex=0, isMulti=false;   // multi-disque (FF7=3 CD) : m3u paresseux, 1 CHD en RAM à la fois
     var CONTENT_DIR='/home/web_user/retroarch/userdata/content';
+    var CFG_PATH='/home/web_user/retroarch/userdata/retroarch.cfg';
+    var fpsOn=false; try{ fpsOn=(localStorage.getItem('psx_fps')==='1'); }catch(_){ }
+    // Config RetroArch au lancement (binds + compteur FPS de RetroArch si activé)
+    function raCfg(){ var c=Object.assign({},BINDS); if(fpsOn) c.fps_show=true; return c; }
+    // Active/désactive le compteur FPS EN DIRECT : réécrit fps_show dans la config + recharge la config.
+    function applyFpsLive(){
+      if(!ng) return false;
+      try{
+        var FS=ng.getEmscriptenFS(); var cfg=FS.readFile(CFG_PATH,{encoding:'utf8'});
+        var line='fps_show = "'+(fpsOn?'true':'false')+'"';
+        cfg = /^fps_show\s*=.*$/m.test(cfg) ? cfg.replace(/^fps_show\s*=.*$/m, line) : (cfg.replace(/\n*$/,'\n')+line+'\n');
+        FS.writeFile(CFG_PATH, cfg);
+        var M=ng.getEmscriptenModule();
+        if(M && typeof M._cmd_reload_config==='function'){ M._cmd_reload_config(); return true; }
+      }catch(e){ }
+      return false;
+    }
+    function toggleFps(){
+      fpsOn=!fpsOn; try{ localStorage.setItem('psx_fps', fpsOn?'1':'0'); }catch(_){ }
+      var btn=document.getElementById('btn-fps'); if(btn) btn.classList.toggle('on', fpsOn);
+      if(ng){ if(applyFpsLive()) log('Compteur FPS '+(fpsOn?'activé':'désactivé')+'.','ok');
+        else log('Compteur FPS '+(fpsOn?'activé':'désactivé')+' — effectif au prochain lancement.','muted'); }
+    }
     var biosBlob=null, biosName=null, discExtra=[];
     var statusEl=document.getElementById('status'), statusText=document.getElementById('status-text'),
         progBar=document.getElementById('progress-bar'), progPct=document.getElementById('progress-pct');
@@ -3681,7 +3707,7 @@ try {
         if(discs[0].sbi){ romList.push({fileName:sbiName(discs[0].fsName), fileContent:discs[0].sbi}); }
         var opts={ element:canvas, core:'pcsx_rearmed',
           resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;},
-          rom: romList, retroarchConfig:Object.assign({},BINDS),
+          rom: romList, retroarchConfig:raCfg(),
           retroarchCoreConfig:{ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock' } };
         if(biosBlob){ opts.bios={ fileName:biosName, fileContent:biosBlob }; }
         log('Lancement Nostalgist (m3u)…');
@@ -3723,7 +3749,7 @@ try {
         var opts={ element:canvas, core:'pcsx_rearmed',
           resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;},
           rom: romList.length===1 ? romList[0] : romList,
-          retroarchConfig:Object.assign({},BINDS),
+          retroarchConfig:raCfg(),
           retroarchCoreConfig:{ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock' } };
         if(biosBlob){ opts.bios={ fileName:biosName, fileContent:biosBlob }; }
         log('Lancement Nostalgist…');
@@ -3814,6 +3840,7 @@ try {
         else if(act==='pad'){ pad.classList.toggle('show'); setTimeout(fit,30); }
         else if(act==='togglelog'){ logEl.classList.toggle('show'); }
         else if(act==='disc'){ if(isMulti&&discs.length>1){ await swapDisc((curDiscIndex+1)%discs.length); } }
+        else if(act==='fps-toggle'){ toggleFps(); }
         else if(!ng){ log('Charge d\u2019abord un disque.','muted'); }
         else if(act==='savestate'){ var r=await ng.saveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); log('État sauvegardé dans la page.','ok'); }
         else if(act==='loadstate'){ var st=await idbGet('state:'+romId); if(!st){ log('Aucun état en page pour ce jeu.'); } else { await ng.loadState(st); log('État rechargé.','ok'); } }
@@ -3824,14 +3851,15 @@ try {
       }catch(err){ showLog(); log('Action « '+act+' » : '+(err&&(err.message||err)),'err'); }
     });
     document.getElementById('file-state').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng) return; try{ await ng.loadState(new Uint8Array(await f.arrayBuffer())); log('État chargé : '+f.name,'ok'); }catch(err){ showLog(); log('Chargement état : '+(err&&(err.message||err)),'err'); } });
-    document.getElementById('file-sram').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng||!curFile) return; try{ if(ng&&ng.exit) await ng.exit(); }catch(_){ } try{ var sram=new Uint8Array(await f.arrayBuffer()); freshCanvas(); var blobs=coreBlobs(); var opts={ element:canvas, core:'pcsx_rearmed', resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;}, rom:{fileName:'game.'+curExt,fileContent:new Uint8Array(await curFile.arrayBuffer())}, sram:sram, retroarchConfig:Object.assign({},BINDS), retroarchCoreConfig:{pcsx_rearmed_bios:(biosBlob?'auto':'HLE'),pcsx_rearmed_pad1type:'dualshock'} }; if(biosBlob) opts.bios={fileName:biosName,fileContent:biosBlob}; ng=await Nostalgist.launch(opts); fit(); log('Carte mémoire importée et jeu relancé.','ok'); }catch(err){ showLog(); log('Import carte mémoire : '+(err&&(err.message||err)),'err'); } });
+    document.getElementById('file-sram').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng||!curFile) return; try{ if(ng&&ng.exit) await ng.exit(); }catch(_){ } try{ var sram=new Uint8Array(await f.arrayBuffer()); freshCanvas(); var blobs=coreBlobs(); var opts={ element:canvas, core:'pcsx_rearmed', resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;}, rom:{fileName:'game.'+curExt,fileContent:new Uint8Array(await curFile.arrayBuffer())}, sram:sram, retroarchConfig:raCfg(), retroarchCoreConfig:{pcsx_rearmed_bios:(biosBlob?'auto':'HLE'),pcsx_rearmed_pad1type:'dualshock'} }; if(biosBlob) opts.bios={fileName:biosName,fileContent:biosBlob}; ng=await Nostalgist.launch(opts); fit(); log('Carte mémoire importée et jeu relancé.','ok'); }catch(err){ showLog(); log('Import carte mémoire : '+(err&&(err.message||err)),'err'); } });
 
     (function init(){ log(location.protocol==='file:'?'Contexte : file:// (double-clic).':'Contexte : '+location.protocol+' (servi).');
       var iso=('crossOriginIsolated' in window)?window.crossOriginIsolated:false, sab=(typeof SharedArrayBuffer!=='undefined');
       if(iso){ try{sessionStorage.removeItem('coiReloaded');}catch(_){ } log('Isolation crossOrigin : OK (streaming threadé dispo).','ok'); }
       else { log('Isolation crossOrigin : NON'+(sab?' (SAB présent)':'')+' — le core threadé nécessite COOP/COEP via le service worker.','warn');
         if(location.protocol==='file:') log('Le streaming exige un contexte servi (http/https) + service worker : file:// ne peut pas isoler.','muted'); }
-      renderHistory(); })();
+      renderHistory();
+      if(fpsOn){ var _fb=document.getElementById('btn-fps'); if(_fb) _fb.classList.add('on'); } })();
     // Service worker : cache offline + COOP/COEP. Recharge une fois pour gagner l'isolation au 1er lancement.
     if('serviceWorker' in navigator && location.protocol.startsWith('http')){
       navigator.serviceWorker.register('sw.js').then(function(){
