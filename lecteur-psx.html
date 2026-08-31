@@ -101,6 +101,7 @@
       <span class="tag" id="tag">Lecteur PSX</span>
       <button data-act="menu" class="primary">Menu</button>
       <button data-act="loadrom">Charger disque</button>
+      <button data-act="disc" id="btn-disc" style="display:none">Disque 1/1</button>
       <button data-act="fs">Plein écran</button>
       <button data-act="pad">Manette</button>
       <button data-act="savestate">Sauver état</button>
@@ -3484,6 +3485,8 @@ try {
         logEl=document.getElementById('log')||mklog();
     function mklog(){ var d=document.createElement('div'); d.id='log'; document.body.appendChild(d); return d; }
     var ng=null, curName='disc', curExt='chd', curFile=null, romId='disc', held={}, busy=false;
+    var discs=[], curDiscIndex=0, isMulti=false;   // multi-disque (FF7=3 CD) : m3u paresseux, 1 CHD en RAM à la fois
+    var CONTENT_DIR='/home/web_user/retroarch/userdata/content';
     var biosBlob=null, biosName=null, discExtra=[];
     var statusEl=document.getElementById('status'), statusText=document.getElementById('status-text'),
         progBar=document.getElementById('progress-bar'), progPct=document.getElementById('progress-pct');
@@ -3612,11 +3615,96 @@ try {
       stopAutoSave();
       try{ if(ng&&ng.exit){ await ng.exit(); } }catch(_){ }
       ng=null; curFile=null;              // lâche les références -> l'ancien disque (tas WASM) devient collectable
+      isMulti=false; discs=[]; try{ document.getElementById('btn-disc').style.display='none'; }catch(_){ }
       try{ if(window.gc) window.gc(); }catch(_){ }   // inoffensif hors mode debug
     }
+    // ---------- Multi-disque (m3u paresseux : N disques listés, UN SEUL en RAM à la fois) ----------
+    function wait(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+    function discNum(name){ var m=/[\(\[]?\s*(?:disc|disk|cd)\s*[:#\-]?\s*(\d+)/i.exec(name); return m?parseInt(m[1],10):null; }
+    function sbiName(fsName){ return fsName.replace(/\.[^.]+$/,'.sbi'); }
+    function updateDiscUI(){
+      var btn=document.getElementById('btn-disc');
+      if(isMulti && discs.length>1){ btn.style.display=''; btn.textContent='Disque '+(curDiscIndex+1)+'/'+discs.length;
+        tag.textContent=curName+' — Disque '+(curDiscIndex+1)+'/'+discs.length; }
+      else { btn.style.display='none'; }
+    }
+    // Écrit un disque (gros) en MEMFS PAR MORCEAUX (pas de pic RAM) + son .sbi éventuel.
+    async function writeDiscToFS(FS, fsName, file, sbiU8){
+      var stream=FS.open(CONTENT_DIR+'/'+fsName,'w'), CHUNK=8*1024*1024;
+      for(var off=0; off<file.size; off+=CHUNK){
+        var chunk=new Uint8Array(await file.slice(off,off+CHUNK).arrayBuffer());
+        FS.write(stream, chunk, 0, chunk.length, off);
+      }
+      FS.close(stream);
+      if(sbiU8){ try{ FS.writeFile(CONTENT_DIR+'/'+sbiName(fsName), sbiU8); }catch(_){ } }
+    }
+    function unlinkDisc(FS, fsName){ try{ FS.unlink(CONTENT_DIR+'/'+fsName); }catch(_){ } try{ FS.unlink(CONTENT_DIR+'/'+sbiName(fsName)); }catch(_){ } }
+    // Change de disque : écrit le cible, éjecte → aligne l'index → insère, puis libère l'ancien.
+    async function swapDisc(target){
+      if(!isMulti || busy || !ng || target===curDiscIndex || target<0 || target>=discs.length) return;
+      busy=true;
+      try{
+        var FS=ng.getEmscriptenFS(); var d=discs[target];
+        log('Changement de disque → '+(target+1)+'/'+discs.length+'…','muted');
+        await writeDiscToFS(FS, d.fsName, d.file, d.sbi);            // 1) écrit le disque cible
+        ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(250);        // 2) ouvre le plateau
+        var delta=target-curDiscIndex, cmd=delta>0?'DISK_NEXT':'DISK_PREV';
+        for(var i=0;i<Math.abs(delta);i++){ ng.sendCommand(cmd); await wait(150); }  // 3) aligne l'index
+        ng.sendCommand('DISK_EJECT_TOGGLE'); await wait(250);        // 4) insère → le core ouvre le nouveau fichier
+        var old=discs[curDiscIndex]; curDiscIndex=target;
+        unlinkDisc(FS, old.fsName);                                  // 5) libère l'ancien (jamais 2 disques en RAM)
+        updateDiscUI(); log('Disque '+(target+1)+'/'+discs.length+' inséré.','ok');
+        try{ canvas.focus(); }catch(_){ }
+      }catch(e){ showLog(); log('Changement de disque : '+(e&&(e.message||e)),'err'); }
+      finally{ busy=false; }
+    }
+    async function launchMulti(discList){
+      if(busy) return; busy=true;
+      try{
+        isMulti=true; discs=discList; curDiscIndex=0;
+        discs.forEach(function(d,i){ d.fsName='disc'+(i+1)+'.'+detectExt(d.file.name); });
+        curName=(baseName(discList[0].file.name).replace(/\s*[\(\[]?\s*(?:disc|disk|cd)\s*\d+.*$/i,'').trim())||'jeu';
+        curExt='m3u'; curFile=discList[0].file;
+        var totalSize=discs.reduce(function(a,d){return a+d.file.size;},0);
+        romId=quickId(curName,totalSize);
+        tag.textContent=curName; buildPad();
+        showStatus('Multi-disque : '+discs.length+' CD — un seul chargé à la fois.'); setProgress(null);
+        var m3u=discs.map(function(d){return d.fsName;}).join('\n')+'\n';
+        log('Multi-disque ('+discs.length+' CD) — m3u paresseux, disque 1 chargé · BIOS '+(biosBlob?biosName:'HLE'),'ok');
+        var blobs=coreBlobs();
+        try{ if(ng&&ng.exit){ await ng.exit(); } }catch(_){ } ng=null;
+        freshCanvas();
+        // rom[0] = le m3u (chargé par RetroArch) ; on n'écrit QUE le disque 1 (+ son sbi) → 1× la taille d'un CD
+        var romList=[{ fileName:'game.m3u', fileContent:new Blob([m3u],{type:'text/plain'}) },
+                     { fileName:discs[0].fsName, fileContent:discs[0].file }];
+        if(discs[0].sbi){ romList.push({fileName:sbiName(discs[0].fsName), fileContent:discs[0].sbi}); }
+        var opts={ element:canvas, core:'pcsx_rearmed',
+          resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;},
+          rom: romList, retroarchConfig:Object.assign({},BINDS),
+          retroarchCoreConfig:{ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock' } };
+        if(biosBlob){ opts.bios={ fileName:biosName, fileContent:biosBlob }; }
+        log('Lancement Nostalgist (m3u)…');
+        ng=await Nostalgist.launch(opts);
+        log('Core lancé.','ok');
+        loader.classList.add('hidden'); statusEl.style.display='none'; document.body.classList.add('running'); document.getElementById('loader-close').style.display='';
+        updateDiscUI(); try{ canvas.focus(); }catch(_){ }
+        fit(); setTimeout(fit,150); setTimeout(fit,600);
+        log('Prêt : '+curName+' ('+discs.length+' CD) — bouton « Disque » pour changer de CD.','ok');
+        try{
+          var _prev=(await histGet()).find(function(x){return x.id===romId;})||{};
+          var _man=await idbGet('state:'+romId), _aut=await idbGet('autostate:'+romId);
+          await histAdd({id:romId,name:curName+' ('+discs.length+' CD)',size:totalSize,ext:'m3u',date:Date.now(),hasState:!!(_man||_aut),stateTs:_prev.stateTs||0,autoTs:_prev.autoTs||0});
+          if(pendingResumeId===romId){ var _useAuto=_aut&&(!_man||(_prev.autoTs||0)>(_prev.stateTs||0)); var _st=_useAuto?_aut:(_man||_aut); if(_st){ await ng.loadState(_st); log('Reprise : sauvegarde '+(_useAuto?'auto':'manuelle')+' rechargée.','ok'); } }
+        }catch(_){ }
+        pendingResumeId=null; startAutoSave();
+      }catch(e){ showLog(); showStatus('Échec : '+(e&&(e.message||e))); setProgress(0); log('Échec multi-disque : '+(e&&(e.message||e)),'err'); }
+      finally{ busy=false; }
+    }
+
     async function launchDisc(mainFile, u8, extraFiles){
       if(busy) return; busy=true;
       try{
+        isMulti=false; discs=[]; document.getElementById('btn-disc').style.display='none';
         curExt=detectExt(mainFile.name); curName=baseName(mainFile.name); curFile=mainFile; romId=quickId(mainFile.name,mainFile.size);
         tag.textContent=curName; buildPad();
         showStatus('Initialisation du core pcsx_rearmed… (plusieurs secondes possibles)'); setProgress(null);
@@ -3673,6 +3761,22 @@ try {
       try{
         if(ng){ showStatus('Libération du jeu précédent…'); await disposeCurrent(); }
         log('Sélection : '+files.map(function(f){return f.name+' ('+(f.size/1048576).toFixed(1)+' Mo)';}).join(', '));
+        // --- Détection MULTI-DISQUE : plusieurs images « à fichier unique » (.chd/.pbp/.iso/.img/.mdf) ---
+        var sbiFiles=files.filter(function(f){ return /\.sbi$/i.test(f.name); });
+        var discFiles=files.filter(function(f){ return ['chd','pbp','iso','img','mdf'].indexOf(detectExt(f.name))>=0; });
+        if(discFiles.length>=2){
+          discFiles.sort(function(a,b){ var na=discNum(a.name), nb=discNum(b.name); if(na!=null&&nb!=null) return na-nb; return a.name.localeCompare(b.name); });
+          var discList=[];
+          for(var k=0;k<discFiles.length;k++){ var df=discFiles[k];
+            var sbiF=sbiFiles.filter(function(s){ return baseName(s.name).toLowerCase()===baseName(df.name).toLowerCase(); })[0];
+            var sbiU8=sbiF?new Uint8Array(await sbiF.arrayBuffer()):null;
+            if(sbiU8) log('SBI détecté pour disque '+(k+1)+' ('+df.name+').','ok');
+            discList.push({ file:df, sbi:sbiU8, label:baseName(df.name) });
+          }
+          await launchMulti(discList);
+          return;
+        }
+        // --- Sinon : disque unique (comportement existant) ---
         var order={cue:0,m3u:1,chd:2,pbp:3,iso:4,img:5,bin:6,mdf:7};
         files.sort(function(a,b){ return (order[detectExt(a.name)]||9)-(order[detectExt(b.name)]||9); });
         var main=files[0];
@@ -3708,6 +3812,7 @@ try {
         else if(act==='fs'){ if(document.fullscreenElement){ await document.exitFullscreen(); } else if(stage.requestFullscreen){ await stage.requestFullscreen(); } else if(stage.webkitRequestFullscreen){ stage.webkitRequestFullscreen(); } }
         else if(act==='pad'){ pad.classList.toggle('show'); setTimeout(fit,30); }
         else if(act==='togglelog'){ logEl.classList.toggle('show'); }
+        else if(act==='disc'){ if(isMulti&&discs.length>1){ await swapDisc((curDiscIndex+1)%discs.length); } }
         else if(!ng){ log('Charge d\u2019abord un disque.','muted'); }
         else if(act==='savestate'){ var r=await ng.saveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); log('État sauvegardé dans la page.','ok'); }
         else if(act==='loadstate'){ var st=await idbGet('state:'+romId); if(!st){ log('Aucun état en page pour ce jeu.'); } else { await ng.loadState(st); log('État rechargé.','ok'); } }
