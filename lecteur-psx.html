@@ -3665,19 +3665,29 @@ void main()
    FragColor = vec4(out_color, 1.0);
 } 
 #endif`;
-    var smoothOn=false; try{ smoothOn=(localStorage.getItem('psx_smooth')==='1'); }catch(_){ }
+    // Variante « 2× » : motif de points 2× plus gros (écran retina → dots trop fins sinon).
+    // On divise pixel_no par 2 et on multiplie d par 2 → l'échantillonnage reste identique (pixel_no*d inchangé),
+    // seul fract(pixel_no) devient 2× plus grossier → cellules de points 2× plus grandes.
+    var DOT_GLSL_X2 = DOT_GLSL.replace('* OrigInputSize;', '* OrigInputSize * 0.5;')
+                              .replace('/ OrigInputSize;', '/ OrigInputSize * 2.0;');
+    // dotMode : 0 = off, 1 = dot normal, 2 = dot 2×
+    var dotMode=0; try{ dotMode=parseInt(localStorage.getItem('psx_dot')||'0',10)||0; }catch(_){ }
     function shaderOpts(){
-      if(!smoothOn) return {};
-      log('Filtre dot/LCD demandé pour ce lancement — si erreur shader, elle apparaîtra ici.','muted');
+      if(!dotMode) return {};
+      var glsl = (dotMode===2) ? DOT_GLSL_X2 : DOT_GLSL;
+      log('Filtre dot'+(dotMode===2?' 2×':'')+' demandé pour ce lancement — si erreur shader, elle apparaîtra ici.','muted');
       return { shader:'dot', resolveShader:function(){ return [
         { fileName:'dot.glslp', fileContent:new Blob([DOT_GLSLP],{type:'text/plain'}) },
-        { fileName:'dot.glsl',  fileContent:new Blob([DOT_GLSL], {type:'text/plain'}) }
+        { fileName:'dot.glsl',  fileContent:new Blob([glsl], {type:'text/plain'}) }
       ]; } };
     }
+    // Cycle OFF → Dot → Dot 2× → OFF
     function toggleSmooth(){
-      smoothOn=!smoothOn; try{ localStorage.setItem('psx_smooth', smoothOn?'1':'0'); }catch(_){ }
-      var btn=document.getElementById('btn-smooth'); if(btn) btn.classList.toggle('on', smoothOn);
-      log('Filtre dot/LCD '+(smoothOn?'activé':'désactivé')+' — effectif au prochain lancement du jeu.','muted');
+      dotMode=(dotMode+1)%3; try{ localStorage.setItem('psx_dot', String(dotMode)); }catch(_){ }
+      var btn=document.getElementById('btn-smooth');
+      if(btn){ btn.classList.toggle('on', dotMode>0); btn.textContent = (dotMode===2) ? 'Dot 2×' : 'Dot'; }
+      var noms=['désactivé','activé','activé (2×)'];
+      log('Filtre dot '+noms[dotMode]+' — effectif au prochain lancement du jeu.','muted');
     }
     var biosBlob=null, biosName=null, discExtra=[];
     var statusEl=document.getElementById('status'), statusText=document.getElementById('status-text'),
@@ -3863,6 +3873,15 @@ void main()
       try{ return await ng.saveState(); }
       catch(e){ if(String(e&&(e.message||e)).indexOf('fs timeout')>=0){ await wait(500); return await ng.saveState(); } throw e; }
     }
+    // Recale l'audio au 1er lancement : reproduit le geste manuel (save→load transitoire), sans toucher
+    // aux sauvegardes de l'utilisateur (l'état est juste ré-appliqué en mémoire). Le son est décalé au
+    // 1er démarrage d'un jeu (buffer AudioWorklet), et un save→load draine/recale le buffer.
+    var _audioResynced=false;
+    async function audioResync(){
+      if(!ng || busy || _audioResynced) return; _audioResynced=true;
+      try{ var r=await robustSaveState(); var st=r&&r.state?r.state:r;
+        if(st){ await robustLoadState(st); log('Audio recalé automatiquement.','muted'); } }catch(_){ }
+    }
     function discNum(name){ var m=/[\(\[]?\s*(?:disc|disk|cd)\s*[:#\-]?\s*(\d+)/i.exec(name); return m?parseInt(m[1],10):null; }
     function sbiName(fsName){ return fsName.replace(/\.[^.]+$/,'.sbi'); }
     function updateDiscUI(){
@@ -3954,6 +3973,7 @@ void main()
         log('Lancement Nostalgist (m3u)…');
         ng=await Nostalgist.launch(opts);
         ensureSaveDirs();   // crée states/ et saves/ (sinon 1er saveState → fs timeout)
+        _audioResynced=false; setTimeout(audioResync, 1800);   // recale l'audio décalé du 1er lancement
         log('Core lancé.','ok');
         loader.classList.add('hidden'); statusEl.style.display='none'; document.body.classList.add('running'); document.getElementById('loader-close').style.display='';
         updateDiscUI(); try{ canvas.focus(); }catch(_){ }
@@ -4000,6 +4020,7 @@ void main()
         log('Lancement Nostalgist…');
         ng=await Nostalgist.launch(opts);
         ensureSaveDirs();   // crée states/ et saves/ (sinon 1er saveState → fs timeout)
+        _audioResynced=false; setTimeout(audioResync, 1800);   // recale l'audio décalé du 1er lancement
         log('Core lancé.','ok');
         loader.classList.add('hidden'); statusEl.style.display='none'; document.body.classList.add('running'); document.getElementById('loader-close').style.display='';
         try{ canvas.focus(); }catch(_){ }
@@ -4120,7 +4141,7 @@ void main()
       try{ var _sc=localStorage.getItem('psx_swapcrash'); if(_sc){ localStorage.removeItem('psx_swapcrash'); var _o=JSON.parse(_sc);
         showLog(); log('⚠ Le dernier changement de disque (CD '+_o.from+'→'+_o.to+' de « '+_o.name+' ») a fait recharger la page — probablement mémoire insuffisante (fréquent sur iPhone lors du swap d\'un gros CD).','err'); } }catch(_){ }
       updateHomeButtons();   // affiche « ▶ Continuer — [titre] » si un jeu est gardé en mémoire
-      if(smoothOn){ var _sb=document.getElementById('btn-smooth'); if(_sb) _sb.classList.add('on'); }
+      if(dotMode>0){ var _sb=document.getElementById('btn-smooth'); if(_sb){ _sb.classList.add('on'); _sb.textContent=(dotMode===2)?'Dot 2×':'Dot'; } }
       })();
     // Service worker : cache offline + COOP/COEP. Recharge une fois pour gagner l'isolation au 1er lancement.
     if('serviceWorker' in navigator && location.protocol.startsWith('http')){
