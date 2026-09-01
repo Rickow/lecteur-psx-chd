@@ -3542,6 +3542,7 @@ try {
     // À injecter dans les options Nostalgist : Object.assign(opts, shaderOpts())
     function shaderOpts(){
       if(!smoothOn) return {};
+      log('Filtre net (sharp-bilinear) demandé pour ce lancement — si erreur shader, elle apparaîtra ici.','muted');
       return { shader:'sharp-bilinear-simple', resolveShader:function(){ return [
         { fileName:'sharp-bilinear-simple.glslp', fileContent:new Blob([SBS_GLSLP],{type:'text/plain'}) },
         { fileName:'sharp-bilinear-simple.glsl',  fileContent:new Blob([SBS_GLSL], {type:'text/plain'}) }
