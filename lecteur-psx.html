@@ -28,6 +28,7 @@
   #bar button{font:inherit;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);background:#141414;border:1px solid var(--line);border-radius:6px;padding:.42rem .6rem;cursor:pointer}
   #bar button:hover{border-color:var(--glow);color:#fff}
   #bar button.primary{background:var(--glow);color:#0a0a0a;border-color:var(--glow)}
+  #btn-smooth.on{background:#4c9df0;color:#06213d;border-color:#4c9df0}
   #bar .spacer{flex:1} #bar .tag{font-size:.6rem;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;max-width:36vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #pad{position:fixed;left:0;right:0;bottom:0;z-index:16;display:none;pointer-events:none;--k:clamp(42px,13vw,60px);padding:.3rem max(.7rem,env(safe-area-inset-right)) max(.7rem,env(safe-area-inset-bottom)) max(.7rem,env(safe-area-inset-left))}
   #pad.show{display:block}
@@ -87,6 +88,7 @@
       <button data-act="disc" id="btn-disc" style="display:none">Disque 1/1</button>
       <button data-act="fs">Plein écran</button>
       <button data-act="pad">Manette</button>
+      <button data-act="smooth" id="btn-smooth" title="Filtre net sharp-bilinear (effectif au prochain lancement)">Net</button>
       <button data-act="savestate">Sauver état</button>
       <button data-act="loadstate">Charger état</button>
       <button data-act="exportstate">Exporter état</button>
@@ -3493,6 +3495,53 @@ try {
       c.savestate_thumbnail_enable=false;
       c.audio_sync=true; c.audio_rate_control=true; c.audio_latency=32;   // défaut 64 ms → moins d'offset
       return c; }
+    // ---------- Filtre d'affichage sharp-bilinear-simple (pré-scale entier net + bilinéaire final) ----------
+    // Une passe, ~gratuit : pixels nets qui remplissent l'écran à n'importe quel facteur (pas de flou, pas de "trop petit").
+    // Auteur : rsn8887 / TheMaister (domaine public). Embarqué (CDN de shaders bloqué). Débloqué par le fix FBO (gl2.c).
+    var SBS_GLSLP = 'shaders = 1\nshader0 = shaders/sharp-bilinear-simple.glsl\nfilter_linear0 = true\nscale_type0 = viewport\n';
+    var SBS_GLSL = [
+      '#if defined(VERTEX)',
+      'attribute vec4 VertexCoord;',
+      'attribute vec4 TexCoord;',
+      'uniform mat4 MVPMatrix;',
+      'varying vec2 vTexCoord;',
+      'void main(){ gl_Position = MVPMatrix * VertexCoord; vTexCoord = TexCoord.xy; }',
+      '#elif defined(FRAGMENT)',
+      '#ifdef GL_ES',
+      'precision highp float;',
+      '#endif',
+      'uniform sampler2D Texture;',
+      'uniform vec2 TextureSize;',
+      'uniform vec2 InputSize;',
+      'uniform vec2 OutputSize;',
+      'varying vec2 vTexCoord;',
+      'void main(){',
+      '  vec2 texel = vTexCoord * TextureSize;',
+      '  vec2 scale = max(floor(OutputSize / InputSize), vec2(1.0, 1.0));',
+      '  vec2 texel_floored = floor(texel);',
+      '  vec2 s = fract(texel);',
+      '  vec2 region_range = vec2(0.5, 0.5) - vec2(0.5, 0.5) / scale;',
+      '  vec2 center_dist = s - vec2(0.5, 0.5);',
+      '  vec2 f = (center_dist - clamp(center_dist, -region_range, region_range)) * scale + vec2(0.5, 0.5);',
+      '  vec2 mod_texel = texel_floored + f;',
+      '  gl_FragColor = texture2D(Texture, mod_texel / TextureSize);',
+      '}',
+      '#endif'
+    ].join('\n');
+    var smoothOn=false; try{ smoothOn=(localStorage.getItem('psx_smooth')==='1'); }catch(_){ }
+    function shaderOpts(){
+      if(!smoothOn) return {};
+      log('Filtre net (sharp-bilinear) demandé pour ce lancement — si erreur shader, elle apparaîtra ici.','muted');
+      return { shader:'sharp-bilinear-simple', resolveShader:function(){ return [
+        { fileName:'sharp-bilinear-simple.glslp', fileContent:new Blob([SBS_GLSLP],{type:'text/plain'}) },
+        { fileName:'sharp-bilinear-simple.glsl',  fileContent:new Blob([SBS_GLSL], {type:'text/plain'}) }
+      ]; } };
+    }
+    function toggleSmooth(){
+      smoothOn=!smoothOn; try{ localStorage.setItem('psx_smooth', smoothOn?'1':'0'); }catch(_){ }
+      var btn=document.getElementById('btn-smooth'); if(btn) btn.classList.toggle('on', smoothOn);
+      log('Filtre net (sharp-bilinear) '+(smoothOn?'activé':'désactivé')+' — effectif au prochain lancement du jeu.','muted');
+    }
     var biosBlob=null, biosName=null, discExtra=[];
     var statusEl=document.getElementById('status'), statusText=document.getElementById('status-text'),
         progBar=document.getElementById('progress-bar'), progPct=document.getElementById('progress-pct');
@@ -3763,6 +3812,7 @@ try {
           rom: romList, retroarchConfig:raCfg(),
           retroarchCoreConfig:{ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock' } };
         if(biosBlob){ opts.bios={ fileName:biosName, fileContent:biosBlob }; }
+        Object.assign(opts, shaderOpts());   // filtre net optionnel (débloqué par le fix FBO)
 
         log('Lancement Nostalgist (m3u)…');
         ng=await Nostalgist.launch(opts);
@@ -3808,6 +3858,7 @@ try {
           retroarchConfig:raCfg(),
           retroarchCoreConfig:{ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock' } };
         if(biosBlob){ opts.bios={ fileName:biosName, fileContent:biosBlob }; }
+        Object.assign(opts, shaderOpts());   // filtre net optionnel (débloqué par le fix FBO)
 
         log('Lancement Nostalgist…');
         ng=await Nostalgist.launch(opts);
@@ -3909,6 +3960,7 @@ try {
         else if(act==='fs'){ if(document.fullscreenElement){ await document.exitFullscreen(); } else if(stage.requestFullscreen){ await stage.requestFullscreen(); } else if(stage.webkitRequestFullscreen){ stage.webkitRequestFullscreen(); } }
         else if(act==='pad'){ pad.classList.toggle('show'); setTimeout(fit,30); }
         else if(act==='togglelog'){ logEl.classList.toggle('show'); }
+        else if(act==='smooth'){ toggleSmooth(); }
         else if(act==='disc'){ if(isMulti&&discs.length>1){ await swapDisc((curDiscIndex+1)%discs.length); } }
         else if(!ng){ log('Charge d\u2019abord un disque.','muted'); }
         else if(act==='savestate'){ var r=await robustSaveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); log('État sauvegardé dans la page.','ok'); }
@@ -3920,7 +3972,7 @@ try {
       }catch(err){ showLog(); log('Action « '+act+' » : '+(err&&(err.message||err)),'err'); }
     });
     document.getElementById('file-state').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng) return; try{ await robustLoadState(new Uint8Array(await f.arrayBuffer())); log('État importé : '+f.name,'ok'); }catch(err){ showLog(); log('Chargement état : '+(err&&(err.message||err)),'err'); } });
-    document.getElementById('file-sram').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng||!curFile) return; try{ if(ng&&ng.exit) await ng.exit(); }catch(_){ } try{ var sram=new Uint8Array(await f.arrayBuffer()); freshCanvas(); var blobs=coreBlobs(); var opts={ element:canvas, core:'pcsx_rearmed', resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;}, rom:{fileName:'game.'+curExt,fileContent:new Uint8Array(await curFile.arrayBuffer())}, sram:sram, retroarchConfig:raCfg(), retroarchCoreConfig:{pcsx_rearmed_bios:(biosBlob?'auto':'HLE'),pcsx_rearmed_pad1type:'dualshock'} }; if(biosBlob) opts.bios={fileName:biosName,fileContent:biosBlob}; ng=await Nostalgist.launch(opts); ensureSaveDirs(); fit(); log('Carte mémoire importée et jeu relancé.','ok'); }catch(err){ showLog(); log('Import carte mémoire : '+(err&&(err.message||err)),'err'); } });
+    document.getElementById('file-sram').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng||!curFile) return; try{ if(ng&&ng.exit) await ng.exit(); }catch(_){ } try{ var sram=new Uint8Array(await f.arrayBuffer()); freshCanvas(); var blobs=coreBlobs(); var opts={ element:canvas, core:'pcsx_rearmed', resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;}, rom:{fileName:'game.'+curExt,fileContent:new Uint8Array(await curFile.arrayBuffer())}, sram:sram, retroarchConfig:raCfg(), retroarchCoreConfig:{pcsx_rearmed_bios:(biosBlob?'auto':'HLE'),pcsx_rearmed_pad1type:'dualshock'} }; if(biosBlob) opts.bios={fileName:biosName,fileContent:biosBlob}; Object.assign(opts, shaderOpts()); ng=await Nostalgist.launch(opts); ensureSaveDirs(); fit(); log('Carte mémoire importée et jeu relancé.','ok'); }catch(err){ showLog(); log('Import carte mémoire : '+(err&&(err.message||err)),'err'); } });
 
     (function init(){ log(location.protocol==='file:'?'Contexte : file:// (double-clic).':'Contexte : '+location.protocol+' (servi).');
       var iso=('crossOriginIsolated' in window)?window.crossOriginIsolated:false, sab=(typeof SharedArrayBuffer!=='undefined');
@@ -3931,6 +3983,7 @@ try {
       try{ var _sc=localStorage.getItem('psx_swapcrash'); if(_sc){ localStorage.removeItem('psx_swapcrash'); var _o=JSON.parse(_sc);
         showLog(); log('⚠ Le dernier changement de disque (CD '+_o.from+'→'+_o.to+' de « '+_o.name+' ») a fait recharger la page — probablement mémoire insuffisante (fréquent sur iPhone lors du swap d\'un gros CD).','err'); } }catch(_){ }
       updateHomeButtons();   // affiche « ▶ Continuer — [titre] » si un jeu est gardé en mémoire
+      if(smoothOn){ var _sb=document.getElementById('btn-smooth'); if(_sb) _sb.classList.add('on'); }
       })();
     // Service worker : cache offline + COOP/COEP. Recharge une fois pour gagner l'isolation au 1er lancement.
     if('serviceWorker' in navigator && location.protocol.startsWith('http')){
