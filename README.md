@@ -23,10 +23,11 @@ Load a game as a **`.chd`** file (or `.cue/.bin`, `.iso`, `.pbp`…) and play: v
 - ▶️ **PS1 emulation** via the **pcsx_rearmed** core compiled to WebAssembly (multi-threaded).
 - 📄 **Single self-contained HTML page** (core + engine inlined) + a service worker.
 - 📱 **iPhone PWA**: "Add to Home Screen", playable offline.
-- 🕹️ **On-screen touch gamepad** (D-pad, ○✕□△, L/R, Start/Select, sticks) **and** keyboard.
-- 💾 **Save states** (in-page, file export/import) + **memory card**.
-- ⏱️ **Auto-save** every 30 s (crash safety net).
-- 🗂️ **Recent games history**, with resume.
+- 🕹️ **On-screen touch gamepad** (D-pad, ○✕□△, L/R, Start/Select, analog sticks with a DualShock toggle) **and** keyboard.
+- 💿 **Multi-disc games** (FF7/8/9…): load every CD at once, switch discs in-game, only one disc in RAM at a time.
+- ▶️ **Keep in memory + one-click Continue**: your game is kept in the browser, so you relaunch it instantly (no re-selecting files) and resume your latest save.
+- 💾 **Save states** (in-page, file export/import) + **memory card**, with **auto-save** every 30 s.
+- 🖼️ **Optional display filter** (RetroArch handheld *dot*, plus a 2× variant for hi-DPI screens).
 - 🧠 **Memory-optimised**: big games (Final Fantasy VII/VIII) playable on iPhone.
 - 🌍 **SBI support** (libcrypt protection, PAL games).
 - 🗜️ **ISO/BIN/CUE → CHD converter** included (`tools/chd-converter`).
@@ -143,9 +144,10 @@ See **[build/README.md](build/README.md)** (⚠️ a **space-free path** is requ
 
 ## 🧭 Limitations & roadmap
 
-- **Single-disc** for now → **multi-disc** (FF7 = 3 CDs, in-game disc switching) is next.
 - **Interpreter** (no dynarec, iOS forbids JIT): full speed for FF and most games; heavy
   3D titles may occasionally miss the target framerate.
+- **Display shaders**: single-pass filters (dot) work; multi-pass shaders (xBRz/ScaleFX) aren't
+  available in this WebGL build (framebuffer-format limitation).
 - **Lazy CHD loading** (minimal RAM): proven feasible, not wired in yet.
 
 ## 📜 Licence

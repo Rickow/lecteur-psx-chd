@@ -24,10 +24,11 @@ n'est envoyé sur un serveur.
 - ▶️ **Émulation PS1** via le core **pcsx_rearmed** compilé en WebAssembly (multi-thread).
 - 📄 **Une seule page HTML autonome** (core + moteur inlinés) + un service worker.
 - 📱 **PWA iPhone** : « Ajouter à l'écran d'accueil », jouable hors-ligne.
-- 🕹️ **Manette tactile** à l'écran (D-pad, ○✕□△, L/R, Start/Select, sticks) **et** clavier.
-- 💾 **Sauvegardes d'état** (en page, export/import fichier) + **carte mémoire**.
-- ⏱️ **Sauvegarde automatique** toutes les 30 s (filet anti-crash).
-- 🗂️ **Historique** des jeux récents, avec reprise.
+- 🕹️ **Manette tactile** à l'écran (D-pad, ○✕□△, L/R, Start/Select, sticks analogiques avec bascule DualShock) **et** clavier.
+- 💿 **Jeux multi-disque** (FF7/8/9…) : charge tous les CD d'un coup, changement de disque en jeu, un seul disque en RAM à la fois.
+- ▶️ **Gardé en mémoire + reprise en 1 clic** : le jeu est conservé dans le navigateur → tu le relances instantanément (sans re-sélectionner les fichiers) et ta dernière sauvegarde se recharge.
+- 💾 **Sauvegardes d'état** (en page, export/import fichier) + **carte mémoire**, avec **sauvegarde auto** toutes les 30 s.
+- 🖼️ **Filtre d'affichage optionnel** (shader *dot* handheld de RetroArch, + une variante 2× pour les écrans haute densité).
 - 🧠 **Optimisé mémoire** : gros jeux (Final Fantasy VII/VIII) jouables sur iPhone.
 - 🌍 **Multi-langue de disques** : gestion **SBI** (protection *libcrypt*, jeux PAL).
 - 🗜️ **Outil de conversion** ISO/BIN/CUE → **CHD** inclus (`tools/chd-converter`).
@@ -134,9 +135,10 @@ Voir **[build/README.md](build/README.md)** (⚠️ chemin **sans espace** oblig
 
 ## 🧭 Limites & feuille de route
 
-- **Mono-disque** aujourd'hui → **multi-disque** (FF7 = 3 CD, changement en jeu) à venir.
 - **Interpréteur** (pas de dynarec, iOS interdit le JIT) : plein régime pour FF et la
   plupart des jeux ; les gros 3D peuvent parfois dépasser le budget.
+- **Shaders d'affichage** : les filtres 1 passe (dot) marchent ; les multi-passes (xBRz/ScaleFX)
+  ne sont pas disponibles dans ce build WebGL (limitation de format des framebuffers).
 - **Lazy loading** du CHD (RAM minimale) : prouvé faisable, non encore branché.
 
 ## 📜 Licence
