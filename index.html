@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lecteur PSX CHD — PlayStation emulator in a web page</title>
-<meta name="description" content="A PlayStation (PS1) emulator in a single web page. Load a .chd and play — video, sound, touch controls, save states. Installable as a PWA on iPhone.">
+<meta name="description" content="A PlayStation (PS1) emulator in a single web page. Load a .chd and play — video, sound, touch controls, save states, multi-disc games. Installable as a PWA on iPhone.">
 <style>
   :root{--bg:#0a0b0e;--panel:#14171d;--panel2:#1c2027;--bd:#2a303b;--tx:#e8ebf1;--dim:#9aa3b2;
         --acc:#e8c15a;--acc2:#4c9df0;--ok:#3fb950}
@@ -55,9 +55,12 @@
 
   <div class="grid">
     <div class="card"><div class="ic">📱</div><h3>iPhone PWA</h3><p>Add to Home Screen and play offline, full-screen.</p></div>
-    <div class="card"><div class="ic">🕹️</div><h3>Touch gamepad</h3><p>On-screen D-pad, face buttons, L/R, sticks — plus keyboard.</p></div>
+    <div class="card"><div class="ic">🕹️</div><h3>Touch gamepad</h3><p>On-screen D-pad, face buttons, L/R, analog sticks (DualShock toggle) — plus keyboard.</p></div>
+    <div class="card"><div class="ic">💿</div><h3>Multi-disc games</h3><p>FF7/8/9: load every CD at once, switch discs in-game — one disc in RAM at a time.</p></div>
+    <div class="card"><div class="ic">▶️</div><h3>Instant resume</h3><p>Your game is kept in the browser — one click to <em>Continue</em> and reload your latest save.</p></div>
     <div class="card"><div class="ic">💾</div><h3>Save states</h3><p>In-page saves, 30 s auto-save, export/import, memory card.</p></div>
     <div class="card"><div class="ic">🧠</div><h3>Big games</h3><p>Memory-optimised — Final Fantasy VII/VIII playable on iPhone.</p></div>
+    <div class="card"><div class="ic">🖼️</div><h3>Display filter</h3><p>Optional RetroArch handheld <em>dot</em> shader, with a 2× variant for hi-DPI screens.</p></div>
     <div class="card"><div class="ic">🗜️</div><h3>CHD converter</h3><p>Turn your ISO/BIN/CUE into compact <code>.chd</code> files.</p></div>
     <div class="card"><div class="ic">🔓</div><h3>Open source</h3><p>GPL-3.0, reproducible build, fully documented.</p></div>
   </div>
@@ -81,6 +84,7 @@
     <h2>Learn more</h2>
     <div class="links">
       <a href="README.md">📖 README</a>
+      <a href="CHANGELOG.md">🆕 Changelog</a>
       <a href="docs/architecture.md">🏗️ Architecture &amp; solutions</a>
       <a href="CREDITS.md">🙏 Credits &amp; licences</a>
       <a href="build/">🔧 Build from source</a>
