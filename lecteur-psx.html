@@ -71,7 +71,6 @@
   #bios-row a{color:var(--glow);cursor:pointer;text-decoration:underline}
   #resume-game{background:#3fb950;border:none;color:#06210f;border-radius:10px;padding:.6rem 1.1rem;font-weight:600;font-size:.95rem;cursor:pointer}
   #resume-game:hover{background:#35a544}
-  #btn-smooth.on{background:#4c9df0;color:#06213d;border-color:#4c9df0}
 </style>
 </head>
 <body>
@@ -88,7 +87,6 @@
       <button data-act="disc" id="btn-disc" style="display:none">Disque 1/1</button>
       <button data-act="fs">Plein écran</button>
       <button data-act="pad">Manette</button>
-      <button data-act="smooth" id="btn-smooth" title="Filtre net sharp-bilinear (au prochain lancement)">Net</button>
       <button data-act="savestate">Sauver état</button>
       <button data-act="loadstate">Charger état</button>
       <button data-act="exportstate">Exporter état</button>
@@ -3491,54 +3489,6 @@ try {
     // savestate_thumbnail_enable=false : sinon saveState() attend AUSSI une miniature .png que
     // pcsx_rearmed ne génère pas toujours → « fs timeout » alors que l'état est bien écrit (on n'utilise pas la miniature).
     function raCfg(){ var c=Object.assign({},BINDS); c.savestate_thumbnail_enable=false; return c; }
-    // ---------- Filtre d'affichage sharp-bilinear-simple (pré-scale entier net + bilinéaire final) ----------
-    // Une passe, ~gratuit : pixels nets qui remplissent l'écran à n'importe quel facteur (pas de flou, pas de "trop petit").
-    // Auteur du shader : rsn8887 / TheMaister (domaine public). Embarqué car le CDN de shaders est bloqué (offline/CSP).
-    var SBS_GLSLP = 'shaders = 1\nshader0 = shaders/sharp-bilinear-simple.glsl\nfilter_linear0 = true\nscale_type0 = viewport\n';
-    var SBS_GLSL = [
-      '#if defined(VERTEX)',
-      'attribute vec4 VertexCoord;',
-      'attribute vec4 TexCoord;',
-      'uniform mat4 MVPMatrix;',
-      'varying vec2 vTexCoord;',
-      'void main(){ gl_Position = MVPMatrix * VertexCoord; vTexCoord = TexCoord.xy; }',
-      '#elif defined(FRAGMENT)',
-      '#ifdef GL_ES',
-      'precision highp float;',
-      '#endif',
-      'uniform sampler2D Texture;',
-      'uniform vec2 TextureSize;',
-      'uniform vec2 InputSize;',
-      'uniform vec2 OutputSize;',
-      'varying vec2 vTexCoord;',
-      'void main(){',
-      '  vec2 texel = vTexCoord * TextureSize;',
-      '  vec2 scale = max(floor(OutputSize / InputSize), vec2(1.0, 1.0));',
-      '  vec2 texel_floored = floor(texel);',
-      '  vec2 s = fract(texel);',
-      '  vec2 region_range = vec2(0.5, 0.5) - vec2(0.5, 0.5) / scale;',
-      '  vec2 center_dist = s - vec2(0.5, 0.5);',
-      '  vec2 f = (center_dist - clamp(center_dist, -region_range, region_range)) * scale + vec2(0.5, 0.5);',
-      '  vec2 mod_texel = texel_floored + f;',
-      '  gl_FragColor = texture2D(Texture, mod_texel / TextureSize);',
-      '}',
-      '#endif'
-    ].join('\n');
-    var smoothOn=false; try{ smoothOn=(localStorage.getItem('psx_smooth')==='1'); }catch(_){ }
-    // À injecter dans les options Nostalgist : Object.assign(opts, shaderOpts())
-    function shaderOpts(){
-      if(!smoothOn) return {};
-      log('Filtre net (sharp-bilinear) demandé pour ce lancement — si erreur shader, elle apparaîtra ici.','muted');
-      return { shader:'sharp-bilinear-simple', resolveShader:function(){ return [
-        { fileName:'sharp-bilinear-simple.glslp', fileContent:new Blob([SBS_GLSLP],{type:'text/plain'}) },
-        { fileName:'sharp-bilinear-simple.glsl',  fileContent:new Blob([SBS_GLSL], {type:'text/plain'}) }
-      ]; } };
-    }
-    function toggleSmooth(){
-      smoothOn=!smoothOn; try{ localStorage.setItem('psx_smooth', smoothOn?'1':'0'); }catch(_){ }
-      var btn=document.getElementById('btn-smooth'); if(btn) btn.classList.toggle('on', smoothOn);
-      log('Filtre net (sharp-bilinear) '+(smoothOn?'activé':'désactivé')+' — effectif au prochain lancement du jeu.','muted');
-    }
     var biosBlob=null, biosName=null, discExtra=[];
     var statusEl=document.getElementById('status'), statusText=document.getElementById('status-text'),
         progBar=document.getElementById('progress-bar'), progPct=document.getElementById('progress-pct');
@@ -3809,7 +3759,7 @@ try {
           rom: romList, retroarchConfig:raCfg(),
           retroarchCoreConfig:{ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock' } };
         if(biosBlob){ opts.bios={ fileName:biosName, fileContent:biosBlob }; }
-        Object.assign(opts, shaderOpts());   // filtre net optionnel (sharp-bilinear)
+
         log('Lancement Nostalgist (m3u)…');
         ng=await Nostalgist.launch(opts);
         ensureSaveDirs();   // crée states/ et saves/ (sinon 1er saveState → fs timeout)
@@ -3854,7 +3804,7 @@ try {
           retroarchConfig:raCfg(),
           retroarchCoreConfig:{ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock' } };
         if(biosBlob){ opts.bios={ fileName:biosName, fileContent:biosBlob }; }
-        Object.assign(opts, shaderOpts());   // filtre net optionnel (sharp-bilinear)
+
         log('Lancement Nostalgist…');
         ng=await Nostalgist.launch(opts);
         ensureSaveDirs();   // crée states/ et saves/ (sinon 1er saveState → fs timeout)
@@ -3956,7 +3906,6 @@ try {
         else if(act==='pad'){ pad.classList.toggle('show'); setTimeout(fit,30); }
         else if(act==='togglelog'){ logEl.classList.toggle('show'); }
         else if(act==='disc'){ if(isMulti&&discs.length>1){ await swapDisc((curDiscIndex+1)%discs.length); } }
-        else if(act==='smooth'){ toggleSmooth(); }
         else if(!ng){ log('Charge d\u2019abord un disque.','muted'); }
         else if(act==='savestate'){ var r=await robustSaveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); log('État sauvegardé dans la page.','ok'); }
         else if(act==='loadstate'){ var st=await idbGet('state:'+romId); if(!st){ log('Aucun état en page pour ce jeu.'); } else { await robustLoadState(st); log('État rechargé.','ok'); } }
@@ -3967,7 +3916,7 @@ try {
       }catch(err){ showLog(); log('Action « '+act+' » : '+(err&&(err.message||err)),'err'); }
     });
     document.getElementById('file-state').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng) return; try{ await robustLoadState(new Uint8Array(await f.arrayBuffer())); log('État importé : '+f.name,'ok'); }catch(err){ showLog(); log('Chargement état : '+(err&&(err.message||err)),'err'); } });
-    document.getElementById('file-sram').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng||!curFile) return; try{ if(ng&&ng.exit) await ng.exit(); }catch(_){ } try{ var sram=new Uint8Array(await f.arrayBuffer()); freshCanvas(); var blobs=coreBlobs(); var opts={ element:canvas, core:'pcsx_rearmed', resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;}, rom:{fileName:'game.'+curExt,fileContent:new Uint8Array(await curFile.arrayBuffer())}, sram:sram, retroarchConfig:raCfg(), retroarchCoreConfig:{pcsx_rearmed_bios:(biosBlob?'auto':'HLE'),pcsx_rearmed_pad1type:'dualshock'} }; if(biosBlob) opts.bios={fileName:biosName,fileContent:biosBlob}; Object.assign(opts, shaderOpts()); ng=await Nostalgist.launch(opts); ensureSaveDirs(); fit(); log('Carte mémoire importée et jeu relancé.','ok'); }catch(err){ showLog(); log('Import carte mémoire : '+(err&&(err.message||err)),'err'); } });
+    document.getElementById('file-sram').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng||!curFile) return; try{ if(ng&&ng.exit) await ng.exit(); }catch(_){ } try{ var sram=new Uint8Array(await f.arrayBuffer()); freshCanvas(); var blobs=coreBlobs(); var opts={ element:canvas, core:'pcsx_rearmed', resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;}, rom:{fileName:'game.'+curExt,fileContent:new Uint8Array(await curFile.arrayBuffer())}, sram:sram, retroarchConfig:raCfg(), retroarchCoreConfig:{pcsx_rearmed_bios:(biosBlob?'auto':'HLE'),pcsx_rearmed_pad1type:'dualshock'} }; if(biosBlob) opts.bios={fileName:biosName,fileContent:biosBlob}; ng=await Nostalgist.launch(opts); ensureSaveDirs(); fit(); log('Carte mémoire importée et jeu relancé.','ok'); }catch(err){ showLog(); log('Import carte mémoire : '+(err&&(err.message||err)),'err'); } });
 
     (function init(){ log(location.protocol==='file:'?'Contexte : file:// (double-clic).':'Contexte : '+location.protocol+' (servi).');
       var iso=('crossOriginIsolated' in window)?window.crossOriginIsolated:false, sab=(typeof SharedArrayBuffer!=='undefined');
@@ -3978,7 +3927,7 @@ try {
       try{ var _sc=localStorage.getItem('psx_swapcrash'); if(_sc){ localStorage.removeItem('psx_swapcrash'); var _o=JSON.parse(_sc);
         showLog(); log('⚠ Le dernier changement de disque (CD '+_o.from+'→'+_o.to+' de « '+_o.name+' ») a fait recharger la page — probablement mémoire insuffisante (fréquent sur iPhone lors du swap d\'un gros CD).','err'); } }catch(_){ }
       updateHomeButtons();   // affiche « ▶ Continuer — [titre] » si un jeu est gardé en mémoire
-      if(smoothOn){ var _sb=document.getElementById('btn-smooth'); if(_sb) _sb.classList.add('on'); } })();
+      })();
     // Service worker : cache offline + COOP/COEP. Recharge une fois pour gagner l'isolation au 1er lancement.
     if('serviceWorker' in navigator && location.protocol.startsWith('http')){
       navigator.serviceWorker.register('sw.js').then(function(){
