@@ -28,7 +28,7 @@
   #bar button{font:inherit;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);background:#141414;border:1px solid var(--line);border-radius:6px;padding:.42rem .6rem;cursor:pointer}
   #bar button:hover{border-color:var(--glow);color:#fff}
   #bar button.primary{background:var(--glow);color:#0a0a0a;border-color:var(--glow)}
-  #btn-smooth.on{background:#4c9df0;color:#06213d;border-color:#4c9df0}
+  #btn-dot1.on,#btn-dot2.on{background:#4c9df0;color:#06213d;border-color:#4c9df0}
   #bar .spacer{flex:1} #bar .tag{font-size:.6rem;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;max-width:36vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #pad{position:fixed;left:0;right:0;bottom:0;z-index:16;display:none;pointer-events:none;--k:clamp(42px,13vw,60px);padding:.3rem max(.7rem,env(safe-area-inset-right)) max(.7rem,env(safe-area-inset-bottom)) max(.7rem,env(safe-area-inset-left))}
   #pad.show{display:block}
@@ -88,7 +88,8 @@
       <button data-act="disc" id="btn-disc" style="display:none">Disque 1/1</button>
       <button data-act="fs">Plein écran</button>
       <button data-act="pad">Manette</button>
-      <button data-act="smooth" id="btn-smooth" title="Filtre dot/LCD (effectif au prochain lancement)">Dot</button>
+      <button data-act="dot1" id="btn-dot1" title="Filtre dot (effectif au prochain lancement)">Dot</button>
+      <button data-act="dot2" id="btn-dot2" title="Filtre dot 2× — points plus gros (effectif au prochain lancement)">Dot 2×</button>
       <button data-act="savestate">Sauver état</button>
       <button data-act="loadstate">Charger état</button>
       <button data-act="exportstate">Exporter état</button>
@@ -3681,12 +3682,16 @@ void main()
         { fileName:'dot.glsl',  fileContent:new Blob([glsl], {type:'text/plain'}) }
       ]; } };
     }
-    // Cycle OFF → Dot → Dot 2× → OFF
-    function toggleSmooth(){
-      dotMode=(dotMode+1)%3; try{ localStorage.setItem('psx_dot', String(dotMode)); }catch(_){ }
-      var btn=document.getElementById('btn-smooth');
-      if(btn){ btn.classList.toggle('on', dotMode>0); btn.textContent = (dotMode===2) ? 'Dot 2×' : 'Dot'; }
-      var noms=['désactivé','activé','activé (2×)'];
+    // Deux boutons dédiés : « Dot » (mode 1) et « Dot 2× » (mode 2). Re-cliquer le mode actif l'éteint.
+    function updateDotButtons(){
+      var b1=document.getElementById('btn-dot1'), b2=document.getElementById('btn-dot2');
+      if(b1) b1.classList.toggle('on', dotMode===1);
+      if(b2) b2.classList.toggle('on', dotMode===2);
+    }
+    function setDotMode(m){
+      dotMode = (dotMode===m) ? 0 : m; try{ localStorage.setItem('psx_dot', String(dotMode)); }catch(_){ }
+      updateDotButtons();
+      var noms={0:'désactivé',1:'activé',2:'activé (2×)'};
       log('Filtre dot '+noms[dotMode]+' — effectif au prochain lancement du jeu.','muted');
     }
     var biosBlob=null, biosName=null, discExtra=[];
@@ -4118,7 +4123,8 @@ void main()
         else if(act==='fs'){ if(document.fullscreenElement){ await document.exitFullscreen(); } else if(stage.requestFullscreen){ await stage.requestFullscreen(); } else if(stage.webkitRequestFullscreen){ stage.webkitRequestFullscreen(); } }
         else if(act==='pad'){ pad.classList.toggle('show'); setTimeout(fit,30); }
         else if(act==='togglelog'){ logEl.classList.toggle('show'); }
-        else if(act==='smooth'){ toggleSmooth(); }
+        else if(act==='dot1'){ setDotMode(1); }
+        else if(act==='dot2'){ setDotMode(2); }
         else if(act==='disc'){ if(isMulti&&discs.length>1){ await swapDisc((curDiscIndex+1)%discs.length); } }
         else if(!ng){ log('Charge d\u2019abord un disque.','muted'); }
         else if(act==='savestate'){ var r=await robustSaveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); log('État sauvegardé dans la page.','ok'); }
@@ -4141,7 +4147,7 @@ void main()
       try{ var _sc=localStorage.getItem('psx_swapcrash'); if(_sc){ localStorage.removeItem('psx_swapcrash'); var _o=JSON.parse(_sc);
         showLog(); log('⚠ Le dernier changement de disque (CD '+_o.from+'→'+_o.to+' de « '+_o.name+' ») a fait recharger la page — probablement mémoire insuffisante (fréquent sur iPhone lors du swap d\'un gros CD).','err'); } }catch(_){ }
       updateHomeButtons();   // affiche « ▶ Continuer — [titre] » si un jeu est gardé en mémoire
-      if(dotMode>0){ var _sb=document.getElementById('btn-smooth'); if(_sb){ _sb.classList.add('on'); _sb.textContent=(dotMode===2)?'Dot 2×':'Dot'; } }
+      updateDotButtons();
       })();
     // Service worker : cache offline + COOP/COEP. Recharge une fois pour gagner l'isolation au 1er lancement.
     if('serviceWorker' in navigator && location.protocol.startsWith('http')){
