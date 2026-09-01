@@ -88,7 +88,7 @@
       <button data-act="disc" id="btn-disc" style="display:none">Disque 1/1</button>
       <button data-act="fs">Plein écran</button>
       <button data-act="pad">Manette</button>
-      <button data-act="smooth" id="btn-smooth" title="Filtre net sharp-bilinear (effectif au prochain lancement)">Net</button>
+      <button data-act="smooth" id="btn-smooth" title="Filtre dot/LCD (effectif au prochain lancement)">Dot</button>
       <button data-act="savestate">Sauver état</button>
       <button data-act="loadstate">Charger état</button>
       <button data-act="exportstate">Exporter état</button>
@@ -3495,12 +3495,11 @@ try {
       c.savestate_thumbnail_enable=false;
       c.audio_sync=true; c.audio_rate_control=true; c.audio_latency=32;   // défaut 64 ms → moins d'offset
       return c; }
-    // ---------- Filtre d'affichage sharp-bilinear-simple (pré-scale entier net + bilinéaire final) ----------
-    // Une passe, ~gratuit : pixels nets qui remplissent l'écran à n'importe quel facteur (pas de flou, pas de "trop petit").
-    // Auteur : rsn8887 / TheMaister (domaine public). Embarqué (CDN de shaders bloqué). Débloqué par le fix FBO (gl2.c).
-    // Pas de scale_type → passe unique rendue DIRECTEMENT à l'écran (évite le FBO intermédiaire 0x0 de ce build).
-    var SBS_GLSLP = 'shaders = 1\nshader0 = shaders/sharp-bilinear-simple.glsl\nfilter_linear0 = true\n';
-    var SBS_GLSL = [
+    // ---------- Filtre d'affichage dot/LCD (grille de sous-pixels façon écran portable) ----------
+    // Une passe, rendue DIRECTEMENT à l'écran (pas de scale_type → pas de FBO intermédiaire, qui est cassé dans ce build).
+    // Échantillon net (centre du texel) + gaps sombres entre pixels → look « dot matrix », visible en basse déf.
+    var DOT_GLSLP = 'shaders = 1\nshader0 = shaders/dot-lcd.glsl\nfilter_linear0 = false\n';
+    var DOT_GLSL = [
       '#if defined(VERTEX)',
       'attribute vec4 VertexCoord;',
       'attribute vec4 TexCoord;',
@@ -3513,35 +3512,33 @@ try {
       '#endif',
       'uniform sampler2D Texture;',
       'uniform vec2 TextureSize;',
-      'uniform vec2 InputSize;',
-      'uniform vec2 OutputSize;',
       'varying vec2 vTexCoord;',
       'void main(){',
-      '  vec2 texel = vTexCoord * TextureSize;',
-      '  vec2 scale = max(floor(OutputSize / InputSize), vec2(1.0, 1.0));',
-      '  vec2 texel_floored = floor(texel);',
-      '  vec2 s = fract(texel);',
-      '  vec2 region_range = vec2(0.5, 0.5) - vec2(0.5, 0.5) / scale;',
-      '  vec2 center_dist = s - vec2(0.5, 0.5);',
-      '  vec2 f = (center_dist - clamp(center_dist, -region_range, region_range)) * scale + vec2(0.5, 0.5);',
-      '  vec2 mod_texel = texel_floored + f;',
-      '  gl_FragColor = texture2D(Texture, mod_texel / TextureSize);',
+      '  vec2 texel  = vTexCoord * TextureSize;',
+      '  vec2 center = (floor(texel) + 0.5) / TextureSize;',   // échantillon net centré sur le pixel source
+      '  vec3 color  = texture2D(Texture, center).rgb;',
+      '  vec2 cell   = fract(texel);',                          // position dans la cellule du pixel source [0,1]
+      '  float gw    = 0.12;',                                  // épaisseur relative du gap de grille
+      '  vec2 g      = smoothstep(vec2(0.0), vec2(gw), cell) * smoothstep(vec2(0.0), vec2(gw), 1.0 - cell);',
+      '  float grid  = g.x * g.y;',                             // 1 au centre du pixel, 0 sur les bords
+      '  float lum   = mix(0.55, 1.0, grid);',                  // gaps assombris à 55%
+      '  gl_FragColor = vec4(color * lum, 1.0);',
       '}',
       '#endif'
     ].join('\n');
     var smoothOn=false; try{ smoothOn=(localStorage.getItem('psx_smooth')==='1'); }catch(_){ }
     function shaderOpts(){
       if(!smoothOn) return {};
-      log('Filtre net (sharp-bilinear) demandé pour ce lancement — si erreur shader, elle apparaîtra ici.','muted');
-      return { shader:'sharp-bilinear-simple', resolveShader:function(){ return [
-        { fileName:'sharp-bilinear-simple.glslp', fileContent:new Blob([SBS_GLSLP],{type:'text/plain'}) },
-        { fileName:'sharp-bilinear-simple.glsl',  fileContent:new Blob([SBS_GLSL], {type:'text/plain'}) }
+      log('Filtre dot/LCD demandé pour ce lancement — si erreur shader, elle apparaîtra ici.','muted');
+      return { shader:'dot-lcd', resolveShader:function(){ return [
+        { fileName:'dot-lcd.glslp', fileContent:new Blob([DOT_GLSLP],{type:'text/plain'}) },
+        { fileName:'dot-lcd.glsl',  fileContent:new Blob([DOT_GLSL], {type:'text/plain'}) }
       ]; } };
     }
     function toggleSmooth(){
       smoothOn=!smoothOn; try{ localStorage.setItem('psx_smooth', smoothOn?'1':'0'); }catch(_){ }
       var btn=document.getElementById('btn-smooth'); if(btn) btn.classList.toggle('on', smoothOn);
-      log('Filtre net (sharp-bilinear) '+(smoothOn?'activé':'désactivé')+' — effectif au prochain lancement du jeu.','muted');
+      log('Filtre dot/LCD '+(smoothOn?'activé':'désactivé')+' — effectif au prochain lancement du jeu.','muted');
     }
     var biosBlob=null, biosName=null, discExtra=[];
     var statusEl=document.getElementById('status'), statusText=document.getElementById('status-text'),
