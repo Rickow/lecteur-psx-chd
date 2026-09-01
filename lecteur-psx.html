@@ -3498,7 +3498,8 @@ try {
     // ---------- Filtre d'affichage sharp-bilinear-simple (pré-scale entier net + bilinéaire final) ----------
     // Une passe, ~gratuit : pixels nets qui remplissent l'écran à n'importe quel facteur (pas de flou, pas de "trop petit").
     // Auteur : rsn8887 / TheMaister (domaine public). Embarqué (CDN de shaders bloqué). Débloqué par le fix FBO (gl2.c).
-    var SBS_GLSLP = 'shaders = 1\nshader0 = shaders/sharp-bilinear-simple.glsl\nfilter_linear0 = true\nscale_type0 = viewport\n';
+    // Pas de scale_type → passe unique rendue DIRECTEMENT à l'écran (évite le FBO intermédiaire 0x0 de ce build).
+    var SBS_GLSLP = 'shaders = 1\nshader0 = shaders/sharp-bilinear-simple.glsl\nfilter_linear0 = true\n';
     var SBS_GLSL = [
       '#if defined(VERTEX)',
       'attribute vec4 VertexCoord;',
