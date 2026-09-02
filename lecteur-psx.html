@@ -28,7 +28,7 @@
   #bar button{font:inherit;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);background:#141414;border:1px solid var(--line);border-radius:6px;padding:.42rem .6rem;cursor:pointer}
   #bar button:hover{border-color:var(--glow);color:#fff}
   #bar button.primary{background:var(--glow);color:#0a0a0a;border-color:var(--glow)}
-  #btn-dot1.on,#btn-dot2.on{background:#4c9df0;color:#06213d;border-color:#4c9df0}
+  #btn-dot1.on,#btn-dot2.on,#btn-hd.on{background:#4c9df0;color:#06213d;border-color:#4c9df0}
   #bar .spacer{flex:1} #bar .tag{font-size:.6rem;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;max-width:36vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #pad{position:fixed;left:0;right:0;bottom:0;z-index:16;display:none;pointer-events:none;--k:clamp(42px,13vw,60px);padding:.3rem max(.7rem,env(safe-area-inset-right)) max(.7rem,env(safe-area-inset-bottom)) max(.7rem,env(safe-area-inset-left))}
   #pad.show{display:block}
@@ -90,6 +90,7 @@
       <button data-act="pad">Manette</button>
       <button data-act="dot1" id="btn-dot1" title="Filtre dot (effectif au prochain lancement)">Dot</button>
       <button data-act="dot2" id="btn-dot2" title="Filtre dot 2× — points plus gros (effectif au prochain lancement)">Dot 2×</button>
+      <button data-act="hd" id="btn-hd" title="Résolution interne ×2 — 3D plus nette (effectif au prochain lancement ; coûte en perf)">HD</button>
       <button data-act="savestate">Sauver état</button>
       <button data-act="loadstate">Charger état</button>
       <button data-act="exportstate">Exporter état</button>
@@ -3673,6 +3674,15 @@ void main()
                               .replace('/ OrigInputSize;', '/ OrigInputSize * 2.0;');
     // dotMode : 0 = off, 1 = dot normal, 2 = dot 2×
     var dotMode=0; try{ dotMode=parseInt(localStorage.getItem('psx_dot')||'0',10)||0; }catch(_){ }
+    var hdOn=false; try{ hdOn=(localStorage.getItem('psx_hd')==='1'); }catch(_){ }
+    // Options du core (identiques aux 3 lancements). enhancement_enable = résolution interne ×2 (bouton HD).
+    function coreCfg(){ var c={ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock' };
+      if(hdOn) c.pcsx_rearmed_neon_enhancement_enable='enabled'; return c; }
+    function toggleHd(){
+      hdOn=!hdOn; try{ localStorage.setItem('psx_hd', hdOn?'1':'0'); }catch(_){ }
+      var btn=document.getElementById('btn-hd'); if(btn) btn.classList.toggle('on', hdOn);
+      log('Résolution HD ×2 (interne) '+(hdOn?'activée':'désactivée')+' — effectif au prochain lancement du jeu.','muted');
+    }
     function shaderOpts(){
       if(!dotMode) return {};
       var glsl = (dotMode===2) ? DOT_GLSL_X2 : DOT_GLSL;
@@ -3971,7 +3981,7 @@ void main()
         var opts={ element:canvas, core:'pcsx_rearmed',
           resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;},
           rom: romList, retroarchConfig:raCfg(),
-          retroarchCoreConfig:{ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock' } };
+          retroarchCoreConfig: coreCfg() };
         if(biosBlob){ opts.bios={ fileName:biosName, fileContent:biosBlob }; }
         Object.assign(opts, shaderOpts());   // filtre net optionnel (débloqué par le fix FBO)
 
@@ -4018,7 +4028,7 @@ void main()
           resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;},
           rom: romList.length===1 ? romList[0] : romList,
           retroarchConfig:raCfg(),
-          retroarchCoreConfig:{ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock' } };
+          retroarchCoreConfig: coreCfg() };
         if(biosBlob){ opts.bios={ fileName:biosName, fileContent:biosBlob }; }
         Object.assign(opts, shaderOpts());   // filtre net optionnel (débloqué par le fix FBO)
 
@@ -4125,6 +4135,7 @@ void main()
         else if(act==='togglelog'){ logEl.classList.toggle('show'); }
         else if(act==='dot1'){ setDotMode(1); }
         else if(act==='dot2'){ setDotMode(2); }
+        else if(act==='hd'){ toggleHd(); }
         else if(act==='disc'){ if(isMulti&&discs.length>1){ await swapDisc((curDiscIndex+1)%discs.length); } }
         else if(!ng){ log('Charge d\u2019abord un disque.','muted'); }
         else if(act==='savestate'){ var r=await robustSaveState(); await idbSet('state:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,stateTs:Date.now()}); log('État sauvegardé dans la page.','ok'); }
@@ -4136,7 +4147,7 @@ void main()
       }catch(err){ showLog(); log('Action « '+act+' » : '+(err&&(err.message||err)),'err'); }
     });
     document.getElementById('file-state').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng) return; try{ await robustLoadState(new Uint8Array(await f.arrayBuffer())); log('État importé : '+f.name,'ok'); }catch(err){ showLog(); log('Chargement état : '+(err&&(err.message||err)),'err'); } });
-    document.getElementById('file-sram').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng||!curFile) return; try{ if(ng&&ng.exit) await ng.exit(); }catch(_){ } try{ var sram=new Uint8Array(await f.arrayBuffer()); freshCanvas(); var blobs=coreBlobs(); var opts={ element:canvas, core:'pcsx_rearmed', resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;}, rom:{fileName:'game.'+curExt,fileContent:new Uint8Array(await curFile.arrayBuffer())}, sram:sram, retroarchConfig:raCfg(), retroarchCoreConfig:{pcsx_rearmed_bios:(biosBlob?'auto':'HLE'),pcsx_rearmed_pad1type:'dualshock'} }; if(biosBlob) opts.bios={fileName:biosName,fileContent:biosBlob}; Object.assign(opts, shaderOpts()); ng=await Nostalgist.launch(opts); ensureSaveDirs(); fit(); log('Carte mémoire importée et jeu relancé.','ok'); }catch(err){ showLog(); log('Import carte mémoire : '+(err&&(err.message||err)),'err'); } });
+    document.getElementById('file-sram').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng||!curFile) return; try{ if(ng&&ng.exit) await ng.exit(); }catch(_){ } try{ var sram=new Uint8Array(await f.arrayBuffer()); freshCanvas(); var blobs=coreBlobs(); var opts={ element:canvas, core:'pcsx_rearmed', resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;}, rom:{fileName:'game.'+curExt,fileContent:new Uint8Array(await curFile.arrayBuffer())}, sram:sram, retroarchConfig:raCfg(), retroarchCoreConfig:coreCfg() }; if(biosBlob) opts.bios={fileName:biosName,fileContent:biosBlob}; Object.assign(opts, shaderOpts()); ng=await Nostalgist.launch(opts); ensureSaveDirs(); fit(); log('Carte mémoire importée et jeu relancé.','ok'); }catch(err){ showLog(); log('Import carte mémoire : '+(err&&(err.message||err)),'err'); } });
 
     (function init(){ log(location.protocol==='file:'?'Contexte : file:// (double-clic).':'Contexte : '+location.protocol+' (servi).');
       var iso=('crossOriginIsolated' in window)?window.crossOriginIsolated:false, sab=(typeof SharedArrayBuffer!=='undefined');
@@ -4148,6 +4159,7 @@ void main()
         showLog(); log('⚠ Le dernier changement de disque (CD '+_o.from+'→'+_o.to+' de « '+_o.name+' ») a fait recharger la page — probablement mémoire insuffisante (fréquent sur iPhone lors du swap d\'un gros CD).','err'); } }catch(_){ }
       updateHomeButtons();   // affiche « ▶ Continuer — [titre] » si un jeu est gardé en mémoire
       updateDotButtons();
+      if(hdOn){ var _hb=document.getElementById('btn-hd'); if(_hb) _hb.classList.add('on'); }
       })();
     // Service worker : cache offline + COOP/COEP. Recharge une fois pour gagner l'isolation au 1er lancement.
     if('serviceWorker' in navigator && location.protocol.startsWith('http')){
