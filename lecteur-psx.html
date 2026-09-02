@@ -3888,15 +3888,6 @@ void main()
       try{ return await ng.saveState(); }
       catch(e){ if(String(e&&(e.message||e)).indexOf('fs timeout')>=0){ await wait(500); return await ng.saveState(); } throw e; }
     }
-    // Recale l'audio au 1er lancement : reproduit le geste manuel (save→load transitoire), sans toucher
-    // aux sauvegardes de l'utilisateur (l'état est juste ré-appliqué en mémoire). Le son est décalé au
-    // 1er démarrage d'un jeu (buffer AudioWorklet), et un save→load draine/recale le buffer.
-    var _audioResynced=false;
-    async function audioResync(){
-      if(!ng || busy || _audioResynced) return; _audioResynced=true;
-      try{ var r=await robustSaveState(); var st=r&&r.state?r.state:r;
-        if(st){ await robustLoadState(st); log('Audio recalé automatiquement.','muted'); } }catch(_){ }
-    }
     function discNum(name){ var m=/[\(\[]?\s*(?:disc|disk|cd)\s*[:#\-]?\s*(\d+)/i.exec(name); return m?parseInt(m[1],10):null; }
     function sbiName(fsName){ return fsName.replace(/\.[^.]+$/,'.sbi'); }
     function updateDiscUI(){
@@ -3988,7 +3979,6 @@ void main()
         log('Lancement Nostalgist (m3u)…');
         ng=await Nostalgist.launch(opts);
         ensureSaveDirs();   // crée states/ et saves/ (sinon 1er saveState → fs timeout)
-        _audioResynced=false; setTimeout(audioResync, 1800);   // recale l'audio décalé du 1er lancement
         log('Core lancé.','ok');
         loader.classList.add('hidden'); statusEl.style.display='none'; document.body.classList.add('running'); document.getElementById('loader-close').style.display='';
         updateDiscUI(); try{ canvas.focus(); }catch(_){ }
@@ -4035,7 +4025,6 @@ void main()
         log('Lancement Nostalgist…');
         ng=await Nostalgist.launch(opts);
         ensureSaveDirs();   // crée states/ et saves/ (sinon 1er saveState → fs timeout)
-        _audioResynced=false; setTimeout(audioResync, 1800);   // recale l'audio décalé du 1er lancement
         log('Core lancé.','ok');
         loader.classList.add('hidden'); statusEl.style.display='none'; document.body.classList.add('running'); document.getElementById('loader-close').style.display='';
         try{ canvas.focus(); }catch(_){ }
@@ -4149,6 +4138,15 @@ void main()
     document.getElementById('file-state').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng) return; try{ await robustLoadState(new Uint8Array(await f.arrayBuffer())); log('État importé : '+f.name,'ok'); }catch(err){ showLog(); log('Chargement état : '+(err&&(err.message||err)),'err'); } });
     document.getElementById('file-sram').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f||!ng||!curFile) return; try{ if(ng&&ng.exit) await ng.exit(); }catch(_){ } try{ var sram=new Uint8Array(await f.arrayBuffer()); freshCanvas(); var blobs=coreBlobs(); var opts={ element:canvas, core:'pcsx_rearmed', resolveCoreJs:async function(){return blobs.js;}, resolveCoreWasm:async function(){return blobs.wasm;}, rom:{fileName:'game.'+curExt,fileContent:new Uint8Array(await curFile.arrayBuffer())}, sram:sram, retroarchConfig:raCfg(), retroarchCoreConfig:coreCfg() }; if(biosBlob) opts.bios={fileName:biosName,fileContent:biosBlob}; Object.assign(opts, shaderOpts()); ng=await Nostalgist.launch(opts); ensureSaveDirs(); fit(); log('Carte mémoire importée et jeu relancé.','ok'); }catch(err){ showLog(); log('Import carte mémoire : '+(err&&(err.message||err)),'err'); } });
 
+    // Pré-chauffage audio : au TOUT premier geste, on crée+reprend un AudioContext pour « réveiller »
+    // le sous-système audio du navigateur AVANT que le core ne crée le sien → réduit l'offset au 1er lancement.
+    (function(){
+      function warm(){
+        try{ var AC=window.AudioContext||window.webkitAudioContext; if(AC){ var c=new AC(); if(c.resume) c.resume(); window.__psxWarmAudio=c; } }catch(_){ }
+        window.removeEventListener('pointerdown',warm,true); window.removeEventListener('keydown',warm,true);
+      }
+      window.addEventListener('pointerdown',warm,true); window.addEventListener('keydown',warm,true);
+    })();
     (function init(){ log(location.protocol==='file:'?'Contexte : file:// (double-clic).':'Contexte : '+location.protocol+' (servi).');
       var iso=('crossOriginIsolated' in window)?window.crossOriginIsolated:false, sab=(typeof SharedArrayBuffer!=='undefined');
       if(iso){ try{sessionStorage.removeItem('coiReloaded');}catch(_){ } log('Isolation crossOrigin : OK (streaming threadé dispo).','ok'); }
