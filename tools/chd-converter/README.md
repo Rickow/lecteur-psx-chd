@@ -20,6 +20,7 @@ For the native GUI (`iso2chd_app.py`), also `python3-tk`
 | **`iso2chd.py`** | command line (batch, recursive, options) |
 | **`iso2chd_app.py`** | native window (Tkinter): file browser + progress bar |
 | **`iso2chd_gui.py`** | local web UI (no GUI dependency) |
+| **`Convertir-en-CHD.bat`** | **Windows, no Python** — drop it in a folder of disc images and double-click (needs only `chdman.exe` next to it or in PATH) |
 
 ```bash
 python3 iso2chd.py my-game.cue                 # → my-game.chd
