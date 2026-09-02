@@ -33,3 +33,21 @@ python3 iso2chd_app.py                         # windowed UI
 Smart detection: a `.bin` referenced by a `.cue` is handled via the `.cue`; a lone `.bin`
 gets an automatic temporary cue. Optional SHA1 verification (`--verify`).
 Run `python3 iso2chd.py --help` for all options.
+
+## Patching a game before conversion (`applyppf.py`)
+
+Some improvements are distributed as **`.ppf`** patches applied to the disc image (the `.bin`),
+**before** converting to CHD:
+
+- a **60 Hz (PAL60) patch** → a PAL game runs at full NTSC speed (no more 50 Hz slowdown);
+- an **anti-libcrypt patch** → removes the copy protection, so the `.sbi` is no longer needed.
+
+`applyppf.py` applies a PPF (1.0 / 2.0 / 3.0) to a `.bin`/`.iso`:
+
+```bash
+python3 applyppf.py game.bin patch60hz.ppf          # patches game.bin (keeps game.bin.bak)
+python3 applyppf.py game.bin nolibcrypt.ppf -o game-patched.bin   # to a copy, original untouched
+```
+
+Then convert the patched image to CHD as usual. The patch applies to the **data track** (`.bin`),
+not the `.cue`. You provide the `.ppf` for your specific game (this repo ships **no** patches).
