@@ -13,7 +13,7 @@ format (compressed, ideal for this player) using **`chdman`** (a MAME tool).
 For the native GUI (`iso2chd_app.py`), also `python3-tk`
 (`sudo apt install python3-tk`).
 
-## Three ways to use it
+## Ways to use it
 
 | File | Usage |
 |---|---|
@@ -21,6 +21,7 @@ For the native GUI (`iso2chd_app.py`), also `python3-tk`
 | **`iso2chd_app.py`** | native window (Tkinter): file browser + progress bar |
 | **`iso2chd_gui.py`** | local web UI (no GUI dependency) |
 | **`Convertir-en-CHD.bat`** | **Windows, no Python** — drop it in a folder of disc images and double-click (needs only `chdman.exe` next to it or in PATH) |
+| **`convertir-en-chd.sh`** | **Linux/macOS, no Python** — same idea: drop it in a folder of disc images and run it (needs only `chdman` in PATH) |
 
 ```bash
 python3 iso2chd.py my-game.cue                 # → my-game.chd
