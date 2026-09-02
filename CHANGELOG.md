@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.2.0
+
+Sharper 3D (HD mode), a faster core, and a proper patching/conversion toolchain.
+
+### ✨ New features
+- **HD mode** — a toolbar toggle for **2× internal resolution** (`neon_enhancement`): real,
+  sharper 3D polygons (not just a filter). Off by default; costs fillrate, so measure per game.
+- **Converter — drop-in launchers**, no Python required (just `chdman`): drop
+  **`Convertir-en-CHD.bat`** (Windows) or **`convertir-en-chd.sh`** (Linux/macOS) into a folder
+  of disc images and run it — converts everything to CHD.
+- **Converter — `applyppf.py`**: apply a **PPF** patch to a disc image *before* CHD conversion,
+  which covers two common needs with one tool:
+  - a **60 Hz (PAL60) patch** → PAL games run at full speed;
+  - an **anti-libcrypt patch** → removes the copy protection, so the `.sbi` is no longer needed.
+
+### 🔧 Improvements
+- **Core rebuilt at `-O3`** (was `-O2`) — better inlining/vectorisation of the vector-friendly
+  paths (GTE, GPU rasteriser, SPU).
+- Renamed the service-worker cache (removed a stray name from another project).
+
+### ⚠️ Notes
+- HD mode multiplies fill-rate work (~4×): great on light games, may slow the heaviest 3D titles.
+- Multi-pass shaders (xBRz/ScaleFX) remain unavailable in this WebGL build; single-pass filters
+  like `dot` work.
+
 ## v1.1.0
 
 Multi-disc support, a much simpler "keep in memory / Continue" flow, an optional
