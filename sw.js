@@ -2,7 +2,7 @@
 /* Service worker : cache offline + injection COOP/COEP (crossOriginIsolated)
    COOP/COEP sont requis pour SharedArrayBuffer → pthreads → core pcsx_rearmed threadé
    (streaming WORKERFS + OffscreenCanvas). Pattern type "coi-serviceworker".            */
-const CACHE='ds-melonds-v2';
+const CACHE='lecteur-psx-v1';
 
 /* Ajoute les en-têtes d'isolation à une réponse same-origin "basic".
    Les réponses opaque (cross-origin) ne peuvent pas être réécrites — on les laisse. */
